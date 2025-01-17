@@ -1,0 +1,66 @@
+recommender_system/
+│
+├── app/
+│   ├── __init__.py
+│   ├── main.py                  # FastAPI application initialization
+│   ├── config.py                # Configuration settings
+│   └── core/
+│       ├── __init__.py
+│       └── errors.py            # Custom error definitions
+│
+├── models/
+│   ├── __init__.py
+│   ├── content_based/
+│   │   ├── __init__.py
+│   │   ├── model.py            # Content-based model implementation
+│   │   └── preprocessing.py     # Content preprocessing utilities
+│   │
+│   ├── collaborative/
+│   │   ├── __init__.py
+│   │   ├── model.py            # Collaborative filtering implementation
+│   │   └── preprocessing.py     # User-item data preprocessing
+│   │
+│   └── hybrid/
+│       ├── __init__.py
+│       ├── model.py            # Hybrid model implementation
+│       └── strategies.py        # Hybrid combination strategies
+│
+├── api/
+│   ├── __init__.py
+│   ├── v1/
+│   │   ├── __init__.py
+│   │   ├── endpoints/
+│   │   │   ├── __init__.py
+│   │   │   ├── content_based.py    # Content-based endpoints
+│   │   │   ├── collaborative.py    # Collaborative filtering endpoints
+│   │   │   └── hybrid.py           # Hybrid recommendation endpoints
+│   │   │
+│   │   ├── dependencies.py     # Shared API dependencies
+│   │   └── router.py           # API router configuration
+│   │
+│   └── dependencies/
+│       └── __init__.py
+│
+├── services/
+│   ├── __init__.py
+│   ├── recommendation_service.py    # Business logic layer
+│   └── data_service.py             # Data access layer
+│
+├── schemas/
+│   ├── __init__.py
+│   ├── requests.py             # Request Pydantic models
+│   └── responses.py            # Response Pydantic models
+│
+├── utils/
+│   ├── __init__.py
+│   └── helpers.py              # Shared utility functions
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_content_based/
+│   ├── test_collaborative/
+│   └── test_hybrid/
+│
+├── requirements.txt
+└── README.md
