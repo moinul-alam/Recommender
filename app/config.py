@@ -2,8 +2,8 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    FAISS_INDEX_PATH: str = "E:/CoRE/recommender/app/index/faiss_index.index"
-    FEATURES_PATH: str = "E:/CoRE/recommender/app/features/featured_combined.csv"
+    FAISS_INDEX_PATH: str
+    FEATURES_PATH: str
     
     class Config:
         env_file = ".env"
