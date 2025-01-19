@@ -1,13 +1,12 @@
-# app/main.py
+# main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.router import api_router
-from app.config import Settings
+from app.api.router import api_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Media Recommender API",
-        description="API for getting media recommendations based on TMDB IDs",
+        title="Content Recommender Engine (CoRE)",
+        description="API for getting media recommendations for Explora",
         version="1.0.0"
     )
     
@@ -21,7 +20,7 @@ def create_app() -> FastAPI:
     )
     
     # Include routers
-    app.include_router(api_router, prefix="/api/v1")
+    app.include_router(api_router, prefix="/api")
     
     return app
 

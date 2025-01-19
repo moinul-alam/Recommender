@@ -1,9 +1,8 @@
-# api/v1/endpoints/content_based.py
+# app/api/endpoints/content_based.py
 from fastapi import APIRouter, HTTPException, Depends
-from models.content_based.model import ContentBasedRecommender
-from schemas.responses import RecommendationResponse
-from app.config import settings
-from services.recommendation_service import get_recommender
+from app.models.content_based.recommender import ContentBasedRecommender
+from app.schemas.responses import RecommendationResponse
+from app.services.recommendation_service import get_recommender
 
 router = APIRouter()
 

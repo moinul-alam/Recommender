@@ -3,7 +3,7 @@ import faiss
 import numpy as np
 import pandas as pd
 from typing import Optional
-from schemas.responses import RecommendationResponse, SimilarMedia
+from app.schemas.responses import RecommendationResponse, SimilarMedia
 
 class ContentBasedRecommender:
     def __init__(self, index_path: str, features_path: str):
