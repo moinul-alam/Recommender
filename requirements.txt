@@ -5,3 +5,6 @@ pandas
 faiss-cpu
 scikit-learn
 requests
+pydantic-settings
+pathlib
+pyarrow
