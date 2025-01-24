@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import logging
 from fastapi import HTTPException
+from app.content_based.DataPreprocessing import DataPreprocessing
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -61,7 +62,8 @@ class ContentBasedRecommender:
                 if similar_media_id == self.tmdbId:
                     continue
                 similarity_score = round(1 / (1 + distances[0][i]), 4)
-                similar_media.append({'tmdbId': similar_media_id, 'similarity': similarity_score})
+                percentage_score = f"{similarity_score * 100:.2f}%"
+                similar_media.append({'tmdbId': similar_media_id, 'similarity': percentage_score})
 
             logger.info(f"Found {len(similar_media)} similar media items")
             return similar_media[:self.n_items]
@@ -75,10 +77,9 @@ class ContentBasedRecommender:
     def recommendation_for_new(self, tmdbId_all: np.ndarray, features_all: np.ndarray) -> List[Dict]:
         try:
             logger.info("Generating recommendations for a new item using metadata...")
-            # Placeholder logic for new items
-            # Replace this with your actual implementation (e.g., metadata-based similarity search)
+
             similar_media = [
-                {'tmdbId': int(id_), 'similarity': 0.0} for id_ in tmdbId_all[:self.n_items]
+                {'tmdbId': self.tmdbId, 'similarity': '100%'}
             ]
             return similar_media
         except Exception as e:

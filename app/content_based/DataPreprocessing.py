@@ -1,3 +1,4 @@
+import gc
 import re
 import pandas as pd
 from typing import List, Optional
@@ -10,25 +11,26 @@ logging.basicConfig(level=logging.INFO)
 class DataPreprocessing:
     text_columns = ['overview', 'genres', 'keywords', 'cast', 'director']
 
-    def __init__(self, file_path: str, segment_size: int = 6000, keep_columns: List[str] = None):
-        self.file_path = file_path
+    def __init__(
+        self, 
+        file_path: Optional[str] = None, 
+        segment_size: int = 6000, 
+        keep_columns: List[str] = None, 
+        df: Optional[pd.DataFrame] = None
+    ):
         self.segment_size = segment_size
-        self.keep_columns = keep_columns or ['tmdbId', 'title', 'original_language', 'overview', 'tagline', 'genres',
-                                             'keywords', 'cast', 'director', 'release_year']
+        self.keep_columns = keep_columns or [
+            'tmdbId', 'title', 'original_language', 'overview', 'tagline', 
+            'genres', 'keywords', 'cast', 'director', 'release_year'
+        ]
+        self.file_path = file_path
+        self.df = df
+
+        # Ensure the class works for both use cases
+        if df is None and file_path is None:
+            raise ValueError("Either 'file_path' or 'df' must be provided.")
 
     def load_dataset(self) -> pd.DataFrame:
-        """Loads the dataset from the specified file path.
-
-        Args:
-            None
-
-        Returns:
-            pd.DataFrame: The loaded DataFrame.
-
-        Raises:
-            ValueError: If segment_size is less than 1.
-            FileNotFoundError: If the file path does not exist.
-        """
         if self.segment_size < 1:
             raise ValueError("segment_size must be at least 1")
 
@@ -43,6 +45,16 @@ class DataPreprocessing:
             raise
 
         return df.copy() 
+    
+    def load_dataframe(self) -> pd.DataFrame:
+        if self.df is None:
+            raise ValueError("DataFrame is not set. Please provide a valid DataFrame.")
+
+        if not isinstance(self.df, pd.DataFrame):
+            raise TypeError("The provided data is not a pandas DataFrame.")
+
+        logger.info(f"Loaded DataFrame with {len(self.df)} rows and {len(self.df.columns)} columns")
+        return self.df.copy()
 
     def handle_missing_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Handles missing data in the DataFrame.
@@ -165,10 +177,29 @@ class DataPreprocessing:
         Returns:
             pd.DataFrame: The preprocessed DataFrame.
         """
-        df = self.load_dataset()
-        df = self.handle_missing_data(df)
-        df = self.handle_release_date(df)
-        df = self.normalize_data(df)
-        df = self.select_columns(df)
-        df = self.segment_dataset(df)
-        return df
+        try:
+            df = self.load_dataset()
+            df = self.handle_missing_data(df)
+            df = self.handle_release_date(df)
+            df = self.normalize_data(df)
+            df = self.select_columns(df)
+            df = self.segment_dataset(df)
+
+            gc.collect()
+            return df
+        except Exception as e:
+            logger.error(f"Error in data processing: {str(e)}")
+            raise
+        
+    def preprocess_new_data(self) -> pd.DataFrame:
+        try:
+            df = self.load_dataframe()
+            df = self.handle_release_date(df)
+            df = self.normalize_data(df)
+
+            gc.collect()
+            return df
+        except Exception as e:
+            logger.error(f"Error in data processing: {str(e)}")
+            raise
+        

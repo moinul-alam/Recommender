@@ -32,7 +32,7 @@ class RecommendationRequest(BaseModel):
      
 class Recommendation(BaseModel):
     tmdbId: int
-    similarity: float
+    similarity: str
 
 class RecommendationResponse(BaseModel):
     message: str
