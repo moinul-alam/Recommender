@@ -9,11 +9,12 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 class DataPreprocessing:
+
     text_columns = ['overview', 'genres', 'keywords', 'cast', 'director']
 
     def __init__(
         self, 
-        file_path: Optional[str] = None, 
+        dataset_path: Optional[str] = None, 
         segment_size: int = 6000, 
         keep_columns: List[str] = None, 
         df: Optional[pd.DataFrame] = None
@@ -23,22 +24,22 @@ class DataPreprocessing:
             'tmdbId', 'title', 'original_language', 'overview', 'tagline', 
             'genres', 'keywords', 'cast', 'director', 'release_year'
         ]
-        self.file_path = file_path
+        self.dataset_path = dataset_path
         self.df = df
 
         # Ensure the class works for both use cases
-        if df is None and file_path is None:
-            raise ValueError("Either 'file_path' or 'df' must be provided.")
+        if df is None and dataset_path is None:
+            raise ValueError("Either 'dataset_path' or 'df' must be provided.")
 
     def load_dataset(self) -> pd.DataFrame:
         if self.segment_size < 1:
             raise ValueError("segment_size must be at least 1")
 
-        if not Path(self.file_path).exists():
-            raise FileNotFoundError(f"File not found: {self.file_path}")
+        if not Path(self.dataset_path).exists():
+            raise FileNotFoundError(f"File not found: {self.dataset_path}")
 
         try:
-            df = pd.read_csv(self.file_path) 
+            df = pd.read_csv(self.dataset_path) 
             logger.info(f"Loaded dataset with {len(df)} rows")
         except Exception as e:
             logger.error(f"Error loading CSV file: {e}")
@@ -57,28 +58,14 @@ class DataPreprocessing:
         return self.df.copy()
 
     def handle_missing_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Handles missing data in the DataFrame.
 
-        Args:
-            df: The DataFrame to process.
-
-        Returns:
-            pd.DataFrame: The DataFrame with missing data handled.
-        """
         initial_rows = len(df)
         df = df.dropna(subset=['tmdbId']).drop_duplicates(subset=['tmdbId'])
         logger.info(f"Removed {initial_rows - len(df)} rows with missing or duplicate tmdbId")
         return df
 
     def handle_release_date(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Handles missing release dates in the DataFrame.
 
-        Args:
-            df: The DataFrame to process.
-
-        Returns:
-            pd.DataFrame: The DataFrame with handled release dates.
-        """
         def extract_year(date: str) -> Optional[int]:
             try:
                 return pd.to_datetime(date).year
@@ -100,14 +87,7 @@ class DataPreprocessing:
         return df
 
     def normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalizes text columns in the DataFrame.
 
-        Args:
-            df: The DataFrame to process.
-
-        Returns:
-            pd.DataFrame: The DataFrame with normalized text columns.
-        """
         def preprocess_text(text: str) -> str:
             """Cleans and preprocesses text data."""
             if pd.isna(text) or text == '':
@@ -140,25 +120,11 @@ class DataPreprocessing:
         return df
     
     def select_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Selects the specified columns from the DataFrame.
 
-        Args:
-            df: The DataFrame to process.
-
-        Returns:
-            pd.DataFrame: The DataFrame with only the selected columns.
-        """
         return df[self.keep_columns]
 
     def segment_dataset(self, df: pd.DataFrame) -> List[pd.DataFrame]:
-        """Segments the DataFrame into smaller chunks.
 
-        Args:
-            df: The DataFrame to segment.
-
-        Returns:
-            List[pd.DataFrame]: A list of DataFrames, each representing a segment.
-        """
         num_segments = (len(df) // self.segment_size) + 1
         segments = []
         for i in range(num_segments):
@@ -190,16 +156,3 @@ class DataPreprocessing:
         except Exception as e:
             logger.error(f"Error in data processing: {str(e)}")
             raise
-        
-    def preprocess_new_data(self) -> pd.DataFrame:
-        try:
-            df = self.load_dataframe()
-            df = self.handle_release_date(df)
-            df = self.normalize_data(df)
-
-            gc.collect()
-            return df
-        except Exception as e:
-            logger.error(f"Error in data processing: {str(e)}")
-            raise
-        

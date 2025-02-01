@@ -1,12 +1,13 @@
 from fastapi import APIRouter
-from api.endpoints.content_based_route import content_based_router
-from api.endpoints.collaborative_route import collaborative_router
-from api.endpoints.hybrid_route import hybrid_router
+from src.api.content_based.v1.endpoint import content_based_router_v1
+from src.api.content_based.v2.endpoint import content_based_router_v2
+from src.api.collaborative.v1.endpoint import collaborative_router
+from src.api.hybrid.v1.endpoint import hybrid_router
 
 router = APIRouter()
 
-# Include recommendation-specific routers
-router.include_router(content_based_router, prefix="/content-based/v1", tags=["Content-Based Recommender (Version 1)"])
+router.include_router(content_based_router_v2, prefix="/content-based/v2", tags=["Content-Based Recommender (Version 2)"])
+router.include_router(content_based_router_v1, prefix="/content-based/v1", tags=["Content-Based Recommender (Version 1)"])
 router.include_router(collaborative_router, prefix="/collaborative/v1", tags=["Collaborative Recommender"])
 router.include_router(hybrid_router, prefix="/hybrid/v1", tags=["Hybrid Recommender"])
 
