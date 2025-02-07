@@ -2,26 +2,82 @@ import logging
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel
-from src.config.collaborative_config import CollaborativeConfigV1
-from src.models.collaborative.v1.services.preprocessing_service import PreprocessingService
-from src.models.collaborative.v1.services.model_training_service import ModelTrainingService
-from src.models.collaborative.v1.services.recommendation_service import RecommendationService
-from src.models.collaborative.v1.services.model_evaluation_service import ModelEvaluationService
+from src.config.collaborative_config import CollaborativeConfigV2
+from src.models.collaborative.v2.services.pipeline_service import PipelineService
+from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
+from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
+from src.models.collaborative.v2.services.recommendation_service import RecommendationService
+from src.models.collaborative.v2.services.model_evaluation_service import ModelEvaluationService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-collaborative_router_v1 = APIRouter()
+collaborative_router_v2 = APIRouter()
 
 class ItemRating(BaseModel):
     tmdb_id: int
     rating: float
 
-dataset_dir_path = CollaborativeConfigV1().DATASET_DIR_PATH
-processed_dir_path = CollaborativeConfigV1().PROCESSED_DIR_PATH
-model_dir_path = CollaborativeConfigV1().MODEL_DIR_PATH
+dataset_dir_path = CollaborativeConfigV2().DATASET_DIR_PATH
+processed_dir_path = CollaborativeConfigV2().PROCESSED_DIR_PATH
+model_dir_path = CollaborativeConfigV2().MODEL_DIR_PATH
 
-@collaborative_router_v1.post("/data-preprocessing")
+@collaborative_router_v2.post("/execute-pipeline")
+def execute_full_pipeline(
+    dataset_dir_path: str = Query(
+        default=str(dataset_dir_path),
+        description="Path to the dataset file"
+    ),
+    processed_dir_path: str = Query(
+        default=str(processed_dir_path),
+        description="Directory to save preprocessed dataset"
+    ),
+    model_dir_path: str = Query(
+        default=str(model_dir_path),
+        description="Directory to save model components"
+    ),
+    sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
+    sparse_item_threshold: int = Query(1, description="Minimum ratings per item"),
+    split_percent: float = Query(0.8, description="Train-test split ratio"),
+    chunk_size: int = Query(10000, description="Chunk size for processing"),
+    normalization: Optional[str] = Query(None, description="L1, L2, None"),
+    n_neighbors: Optional[int] = Query(
+        default=50, 
+        description="Number of nearest neighbors to consider"
+    ),
+    similarity_metric: str = Query(
+        default='L2', 
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
+    batch_size: int = Query(
+        default=10000, 
+        description="Batch size for similarity matrix computation"
+    ),
+    min_similarity: float = Query(
+        default=0.1, 
+        description="Minimum similarity threshold"
+    )
+):
+    try:
+        result = PipelineService.execute_full_pipeline(
+            dataset_dir_path=dataset_dir_path,
+            processed_dir_path=processed_dir_path,
+            model_dir_path=model_dir_path,
+            sparse_user_threshold=sparse_user_threshold,
+            sparse_item_threshold=sparse_item_threshold,
+            split_percent=split_percent,
+            chunk_size=chunk_size,
+            normalization=normalization,
+            n_neighbors=n_neighbors,
+            similarity_metric=similarity_metric,
+            batch_size=batch_size,
+            min_similarity=min_similarity
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+
+@collaborative_router_v2.post("/data-preprocessing")
 def process_data(
     dataset_dir_path: str = Query(
         default=str(dataset_dir_path),
@@ -34,6 +90,8 @@ def process_data(
     sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
     sparse_item_threshold: int = Query(1, description="Minimum ratings per item"),
     split_percent: float = Query(0.8, description="Train-test split ratio"),
+    chunk_size: int = Query(10000, description="Chunk size for processing"),
+    normalization: Optional[str] = Query(None, description="L1, L2, None")
 ):
     logger.info(
         f"Received data preprocessing request with "
@@ -42,6 +100,8 @@ def process_data(
         f"sparse_user_threshold={sparse_user_threshold}, "
         f"sparse_item_threshold={sparse_item_threshold}, "
         f"split_percent={split_percent}"
+        f"chunk_size={chunk_size}"
+        f"normalization={normalization}"
     )
 
     try:
@@ -50,11 +110,14 @@ def process_data(
             processed_dir_path=processed_dir_path,
             sparse_user_threshold=sparse_user_threshold,
             sparse_item_threshold=sparse_item_threshold,
-            split_percent=split_percent
+            split_percent=split_percent,
+            chunk_size=chunk_size,
+            normalization=normalization
         )
         
         if result is None:
-            raise HTTPException(status_code=400, detail="Preprocessing failed")
+            logger.error("Data preprocessing failed")
+            raise HTTPException(status_code=500, detail="Preprocessing failed due to an internal error.")
         
         logger.info(f"Data preprocessing completed successfully: {result}")
         return result
@@ -64,7 +127,7 @@ def process_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@collaborative_router_v1.post("/model-training")
+@collaborative_router_v2.post("/model-training")
 def train_model(
     processed_dir_path: str = Query(
         default=str(processed_dir_path),
@@ -75,12 +138,20 @@ def train_model(
         description="Directory to save model components"
     ),
     n_neighbors: Optional[int] = Query(
-        default=None, 
+        default=50, 
         description="Number of nearest neighbors to consider"
     ),
     similarity_metric: str = Query(
-        default='cosine', 
-        description="Similarity calculation method (cosine/euclidean)"
+        default='L2', 
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
+    batch_size: int = Query(
+        default=10000, 
+        description="Batch size for similarity matrix computation"
+    ),
+    min_similarity: float = Query(
+        default=0.1, 
+        description="Minimum similarity threshold"
     )
 ):
     """
@@ -107,9 +178,10 @@ def train_model(
         result = ModelTrainingService.train_model(
             processed_dir_path=processed_dir_path,
             model_dir_path=model_dir_path,
-            model_components_path=model_dir_path,
             n_neighbors=n_neighbors,
-            similarity_metric=similarity_metric
+            similarity_metric=similarity_metric,
+            batch_size=batch_size,
+            min_similarity=min_similarity
         )
         
         if result is None:
@@ -123,7 +195,7 @@ def train_model(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@collaborative_router_v1.post("/item-recommendations")
+@collaborative_router_v2.post("/recommendations")
 def get_item_recommendations(
     items: Dict[str, float] = Body(
         ...,
@@ -139,26 +211,17 @@ def get_item_recommendations(
     ),
     n_recommendations: int = Query(
         default=10,
-        ge=1,  # Add validation
-        le=100  # Add validation
+        ge=1,
+        le=100
     ),
     min_similarity: float = Query(
         default=0.1,
-        ge=0.0,  # Add validation
-        le=1.0   # Add validation
+        ge=0.0,
+        le=1.0
     )
 ):
-    logger.info(
-        f"Received item recommendation request: "
-        f"n_items={len(items)}, "
-        f"n_items={items},"
-        f"model_dir_path={processed_dir_path}, "
-        f"model_dir_path={model_dir_path}, "
-        f"n_recommendations={n_recommendations}, "
-        f"min_similarity={min_similarity}"
-    )
-
     try:
+        logger.info(f'Generating recommendations for {len(items)} items')
         recommendations = RecommendationService.get_recommendations(
             items=items,
             processed_dir_path=processed_dir_path,
@@ -169,19 +232,18 @@ def get_item_recommendations(
         
         if recommendations is None:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail="Could not generate recommendations"
             )
-        
+
         logger.info(f"Generated {len(recommendations)} recommendations")
         return recommendations
-    
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@collaborative_router_v1.post("/evaluate-model")
+@collaborative_router_v2.post("/evaluate-model")
 def evaluate_model(
     processed_dir_path: str = Query(
         default=str(processed_dir_path),

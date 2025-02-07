@@ -14,3 +14,11 @@ class BaseConfig(BaseSettings):
     @property
     def CONTENT_BASED_DATA_PATH_V2(self) -> Path:
         return self.BASE_DATA_PATH / "content_based" / "v2"
+    
+    @property
+    def COLLABORATIVE_PATH_V1(self) -> Path:
+        return self.BASE_DATA_PATH / "collaborative" / "v1"
+    
+    @property
+    def COLLABORATIVE_PATH_V2(self) -> Path:
+        return self.BASE_DATA_PATH / "collaborative" / "v2"

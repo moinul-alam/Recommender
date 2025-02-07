@@ -126,20 +126,14 @@ class Recommender:
 
     def _update_feature_matrix_and_index(self, new_features: pd.DataFrame):
         """Update the feature matrix and FAISS index with new movie data."""
-        # try:
-        #     new_tmdb_id = new_features.iloc[0, 0]
-
-        #     # Check if the movie already exists in the feature matrix
-        #     if new_tmdb_id not in self.feature_matrix.iloc[:, 0].values:
-        #         # Append new features
-        #         self.feature_matrix = pd.concat([self.feature_matrix, new_features], ignore_index=True)
-        #         self.feature_matrix.to_feather(self.features_file)
-
+     
         try:
             new_tmdb_id = new_features.iloc[0, 0]
-            
+            new_features = new_features.loc[:, ~new_features.columns.str.contains('^Unnamed')]
             # Ensure new_features has the same structure
             new_features = new_features.reset_index(drop=True)
+
+            logger.debug(f"New features columns: {new_features.columns.tolist()}")
             
             if new_tmdb_id not in self.feature_matrix.iloc[:, 0].values:
                 # Append new features

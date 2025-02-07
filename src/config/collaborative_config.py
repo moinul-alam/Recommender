@@ -1,7 +1,33 @@
 from pathlib import Path
 from src.config.base_config import BaseConfig
 
-class CollaborativeConfig(BaseConfig):
+class CollaborativeConfigV1(BaseConfig):
     @property
-    def DATASET_PATH(self) -> Path:
-        return self.BASE_DATA_PATH / "collaborative" / "dataset.csv"
+    def DATASET_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V1 / "1. dataset"
+
+    @property
+    def PROCESSED_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V1 / "2. processed"
+    
+    @property
+    def MODEL_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V1 / "3. models"
+    
+class CollaborativeConfigV2(BaseConfig):
+    @property
+    def DATASET_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V2 / "1. dataset"
+
+    @property
+    def PROCESSED_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V2 / "2. processed"
+    
+    @property
+    def MODEL_DIR_PATH(self) -> Path:
+        return self.COLLABORATIVE_PATH_V2 / "3. models"
+
+
+
+
+

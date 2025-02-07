@@ -1,7 +1,7 @@
 # schemas/responses.py
 import logging
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -55,3 +55,27 @@ class RecommendationResponse(BaseModel):
     status: str
     queriedMedia: int
     similarMedia: List[Recommendation]
+
+
+class EvaluationRequest(BaseModel):
+    index_path: str
+    feature_matrix_path: str
+    num_test_queries: Optional[int] = 100
+
+class IndexStats(BaseModel):
+    total_vectors: int
+    dimension: int
+    is_trained: bool
+    index_type: str
+
+class EvaluationResponse(BaseModel):
+    stats: IndexStats  
+    recall: float
+    precision: float
+    mAP: float
+    NDCG: float
+    query_coverage: float
+    latency: Tuple[float, float] 
+    compression_ratio: float
+    memory_usage: int
+

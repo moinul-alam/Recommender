@@ -22,7 +22,7 @@ class FeatureEngineering:
         max_cast_members: int = 20,
         max_directors: int = 3,
         n_components_svd: int = 200,
-        n_components_pca: int = 200,
+        n_components_pca: int = 300,
         random_state: int = 42
     ):
         """Initialize feature engineering with configurable parameters."""
@@ -30,11 +30,11 @@ class FeatureEngineering:
         
         # Set and validate weights
         self.weights = weights or {
-            "overview": 0.40,
-            "genres": 0.35,
-            "keywords": 0.10,
-            "cast": 0.10, 
-            "director": 0.05
+            "overview": 0.50,
+            "genres": 0.40,
+            "keywords": 0.04,
+            "cast": 0.04, 
+            "director": 0.02
         }
         self._validate_weights()
         
@@ -45,7 +45,7 @@ class FeatureEngineering:
         # Initialize transformers
         self.mlb_genres = MultiLabelBinarizer(sparse_output=True)
         self.tfidf_keywords = TfidfVectorizer(
-            max_features=2000,
+            max_features=1000,
             stop_words="english",
             ngram_range=(1, 2),
             min_df=3,
@@ -53,7 +53,7 @@ class FeatureEngineering:
             norm='l2'
         )
         self.tfidf_overview = TfidfVectorizer(
-            max_features=2000,
+            max_features=5000,
             stop_words="english",
             ngram_range=(1, 2),
             min_df=3,

@@ -1,6 +1,5 @@
 import logging
-from typing import List
-from fastapi import APIRouter, HTTPException, Query, Request, logger
+from fastapi import APIRouter, HTTPException, Query, Request
 from src.config.content_based_config import ContentBasedConfigV2
 from src.models.content_based.v2.services.pipeline_service import PipelineService
 from src.models.content_based.v2.services.preparation_service import PreparationService
@@ -8,7 +7,8 @@ from src.models.content_based.v2.services.preprocessing_service import Preproces
 from src.models.content_based.v2.services.engineering_service import EngineeringService
 from src.models.content_based.v2.services.training_service import TrainingService
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
-from src.schemas.content_based_schema import RecommendationRequest
+from src.models.content_based.v2.services.evaluation_service import EvaluationService
+from src.schemas.content_based_schema import RecommendationRequest, EvaluationResponse
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -217,3 +217,28 @@ async def recommendations(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")
+    
+
+@content_based_router_v2.post("/evaluate-index", response_model=EvaluationResponse)
+async def evaluate_index(
+    model_folder_path: str = Query(
+        default=str(model_folder_path),
+        description="Folder to index"
+    ),
+    features_folder_path: str = Query(
+        default=str(features_folder_path),  
+        description="Folder to feature matrix"
+    ),
+    num_test_queries: int = Query(default=100,
+      description="Number of test queries"),
+):
+
+    try:
+        return EvaluationService.evaluate_index(
+            model_folder_path=model_folder_path,
+            features_folder_path=features_folder_path,
+            num_test_queries=num_test_queries
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error evaluating index: {str(e)}")
+

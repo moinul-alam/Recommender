@@ -8,3 +8,4 @@ requests
 pydantic-settings
 pathlib
 pyarrow
+matplotlib

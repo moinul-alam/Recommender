@@ -48,7 +48,7 @@ class EngineeringService:
                 max_cast_members=20,
                 max_directors=3,
                 n_components_svd=200,
-                n_components_pca=200,
+                n_components_pca=300,
                 random_state=42
             )
 

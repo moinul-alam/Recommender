@@ -106,8 +106,10 @@ class RecommendationService:
                 # Append new_features to the existing feature matrix
                 updated_new_processed_data = pd.concat([processed_df, new_processed_data], ignore_index=True)
 
+                logger.info(f'new data: {updated_new_processed_data}')
+
                 # Save back to features_file
-                updated_new_processed_data.to_csv(processed_file)
+                updated_new_processed_data.to_csv(processed_file, index=False)
 
                 logging.info(f'Newly processed data added to the existing processed dataset.')
 
@@ -121,10 +123,6 @@ class RecommendationService:
             # Filter recommendations based on media type
             filtered_recommendations = []
             for rec in recommendations:
-                # rec_media_type = processed_df.loc[
-                #     processed_df['tmdb_id'] == rec['tmdb_id'], 
-                #     'media_type'
-                # ].iloc[0] if not processed_df.empty else None
                 rec_media_type = processed_df.loc[processed_df['tmdb_id'] == rec['tmdb_id'], 'media_type'].values
                 rec_media_type = rec_media_type[0] if len(rec_media_type) > 0 else None
 
