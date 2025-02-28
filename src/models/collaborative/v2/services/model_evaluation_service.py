@@ -4,7 +4,6 @@ import pickle
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
-from src.models.collaborative.v2.services.recommendation_service import RecommendationService
 from src.models.collaborative.v2.pipeline.ModelEvaluator import ModelEvaluator
 
 logger = logging.getLogger(__name__)
@@ -17,8 +16,7 @@ class ModelEvaluationService:
     @classmethod
     def evaluate_model(
         cls, 
-        processed_dir_path: str,
-        model_dir_path: str,
+        collaborative_dir_path: str,
         sample_size: int = 100,
         n_recommendations: int = 10,
         min_similarity: float = 0.1
@@ -27,43 +25,46 @@ class ModelEvaluationService:
         Evaluates the recommendation model by generating predictions and computing performance metrics.
         """
         try:
-            # Load test dataset
-            test_data_path = os.path.join(processed_dir_path, 'test.feather')
-            if not os.path.exists(test_data_path):
-                raise FileNotFoundError(f"Test dataset not found at {test_data_path}")
+            # Load train dataset
+            train_data_path = os.path.join(collaborative_dir_path, '2_train.feather')
+            test_data_path = os.path.join(collaborative_dir_path, '2_test.feather')
 
+            if not os.path.exists(train_data_path) or not os.path.exists(test_data_path):
+                raise FileNotFoundError("Train or test dataset not found.")
+            
+            train_data = pd.read_feather(train_data_path)
             test_data = pd.read_feather(test_data_path)
-            if test_data.empty:
-                raise ValueError("Test dataset is empty.")
 
-            # Sample the test data
+            if train_data.empty or test_data.empty:
+                raise ValueError("Train or test dataset is empty.")
+
+            # Sample test data
             test_sample = test_data.sample(n=min(sample_size, len(test_data)), random_state=42)
 
-            logger.info(f"Test Data Statistics:")
-            logger.info(f"Total test samples: {len(test_data)}")
-            logger.info(f"Sample size for evaluation: {len(test_sample)}")
-            logger.info(f"Rating distribution in sample:\n{test_sample['rating'].describe()}")
+            # Load mappings
+            def load_pickle(file_name):
+                path = os.path.join(collaborative_dir_path, file_name)
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"{file_name} not found at {path}")
+                with open(path, 'rb') as f:
+                    return pickle.load(f)
 
-            # Load item reverse mapping
-            mapping_path = os.path.join(processed_dir_path, 'item_reverse_mapping.pkl')
-            if not os.path.exists(mapping_path):
-                raise FileNotFoundError(f"Item reverse mapping file not found at {mapping_path}")
+            user_reverse_mapping = load_pickle('2_user_reverse_mapping.pkl')
+            item_reverse_mapping = load_pickle('2_item_reverse_mapping.pkl')
 
-            with open(mapping_path, 'rb') as f:
-                item_reverse_mapping = pickle.load(f)
-
-            # Map internal IDs to TMDB IDs
+            # Convert internal IDs to TMDB IDs
+            test_sample['user_id'] = test_sample['user_id'].map(user_reverse_mapping)
             test_sample['tmdb_id'] = test_sample['tmdb_id'].map(item_reverse_mapping)
-            test_sample = test_sample.dropna(subset=['tmdb_id'])  # Remove invalid mappings
+            test_sample.dropna(subset=['user_id', 'tmdb_id'], inplace=True)
 
             if test_sample.empty:
-                raise ValueError("No valid TMDB IDs found in the test sample after mapping.")
+                raise ValueError("No valid user or item IDs found after mapping.")
 
             # Compute evaluation metrics
             metrics, evaluation_df = ModelEvaluator.compute_recommendation_metrics(
+                train_data=train_data,
                 test_data=test_sample,
-                processed_dir_path=processed_dir_path,
-                model_dir_path=model_dir_path,
+                collaborative_dir_path=collaborative_dir_path,
                 n_recommendations=n_recommendations,
                 min_similarity=min_similarity
             )
@@ -74,14 +75,13 @@ class ModelEvaluationService:
                 'evaluation_details': evaluation_df.to_dict(orient='records')
             }
 
-            results_path = os.path.join(model_dir_path, 'model_evaluation_results.pkl')
+            results_path = os.path.join(collaborative_dir_path, '4_model_evaluation_results.pkl')
             with open(results_path, 'wb') as f:
                 pickle.dump(results, f)
 
-            logger.info(f"Model evaluation completed successfully. Results saved at {results_path}")
+            logger.info(f"Model evaluation completed. Results saved at {results_path}")
             return metrics
 
         except Exception as e:
             logger.error(f"Model evaluation failed: {e}", exc_info=True)
             raise
-

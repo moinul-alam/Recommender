@@ -1,5 +1,6 @@
 import os
 import logging
+import pathlib
 from fastapi import HTTPException
 from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
 from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
@@ -10,42 +11,39 @@ logging.basicConfig(level=logging.INFO)
 class PipelineService:
     @staticmethod
     def execute_full_pipeline(
-        dataset_dir_path: str,
-        processed_dir_path: str,
-        model_dir_path: str,
+        collaborative_dir_path: str,
+        dataset_name: str,
         sparse_user_threshold: int = 5,
         sparse_item_threshold: int = 1,
         split_percent: float = 0.8,
         chunk_size: int = 10000,
         n_neighbors: int = 50,
-        normalization: str = None,
         similarity_metric: str = "L2",
         batch_size: int = 1000,
         min_similarity: float = 0.1
     ):
         try:
-            for path in [dataset_dir_path, processed_dir_path, model_dir_path]:
-                if not os.path.exists(path):
-                    os.makedirs(path, exist_ok=True)
-                elif not os.path.isdir(path):
-                    raise ValueError(f"Provided path '{path}' is not a directory")
+            collaborative_dir_path = pathlib.Path(collaborative_dir_path)
+            
+            if not collaborative_dir_path.exists():
+                logger.error(f"Collaborative directory not found: {collaborative_dir_path}")
+                raise HTTPException(status_code=404, detail=f"Collaborative directory not found: {collaborative_dir_path}")       
+                    
 
             preprocessing_result = PreprocessingService.process_data(
-                dataset_dir_path=dataset_dir_path,
-                processed_dir_path=processed_dir_path,
+                collaborative_dir_path=collaborative_dir_path,
+                dataset_name=dataset_name,
                 sparse_user_threshold=sparse_user_threshold,
                 sparse_item_threshold=sparse_item_threshold,
                 split_percent=split_percent,
-                chunk_size=chunk_size,
-                normalization=normalization
+                chunk_size=chunk_size
             )
 
             if not preprocessing_result:
                 return {"status": "Preprocessing failed"}
 
             training_result = ModelTrainingService.train_model(
-                processed_dir_path=processed_dir_path,
-                model_dir_path=model_dir_path,
+                collaborative_dir_path=collaborative_dir_path,
                 n_neighbors=n_neighbors,
                 similarity_metric=similarity_metric,
                 batch_size=batch_size,

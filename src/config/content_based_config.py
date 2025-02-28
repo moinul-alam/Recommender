@@ -8,6 +8,9 @@ Version 2
 """
 class ContentBasedConfigV2(BaseConfig):
     @property
+    def DIR_PATH(self) -> Path:
+        return self.CONTENT_BASED_DATA_PATH_V2
+    @property
     def RAW_DATA_PATH(self) -> Path:
         return self.CONTENT_BASED_DATA_PATH_V2 / "1_raw" / raw_dataset_name
     

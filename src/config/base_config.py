@@ -22,3 +22,7 @@ class BaseConfig(BaseSettings):
     @property
     def COLLABORATIVE_PATH_V2(self) -> Path:
         return self.BASE_DATA_PATH / "collaborative" / "v2"
+    
+    @property
+    def COLLABORATIVE_PATH_V3(self) -> Path:
+        return self.BASE_DATA_PATH / "collaborative" / "v3"

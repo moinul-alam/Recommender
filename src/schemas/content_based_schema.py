@@ -24,6 +24,7 @@ class Metadata(BaseModel):
     media_type: str
     title: Optional[str]
     overview: Optional[str] = None
+    spoken_languages: Optional[List[str]] = Field(default_factory=list)
     vote_average: Optional[float] = None
     release_year: Optional[str] = None
     genres: Optional[List[str]] = Field(default_factory=list)
@@ -55,7 +56,6 @@ class RecommendationResponse(BaseModel):
     status: str
     queriedMedia: int
     similarMedia: List[Recommendation]
-
 
 class EvaluationRequest(BaseModel):
     index_path: str

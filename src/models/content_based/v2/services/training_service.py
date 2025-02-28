@@ -11,28 +11,20 @@ logging.basicConfig(level=logging.INFO)
 
 class TrainingService:
     @staticmethod
-    def train_model(features_folder_path: str, model_folder_path: str, metric: str) -> PipelineResponse:
+    def train_model(content_based_dir_path: str) -> PipelineResponse:
         try:
             # Convert paths to Path objects
-            features_folder_path = Path(features_folder_path)
-            model_folder_path = Path(model_folder_path)
-
-            # Validate metric
-            if metric not in ["L2", "Inner Product"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported metric: {metric}. Use 'L2' or 'Inner Product'."
-                )
+            content_based_dir_path = Path(content_based_dir_path)
 
             # Validate features folder
-            if not features_folder_path.is_dir():
+            if not content_based_dir_path.is_dir():
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Features folder not found: {features_folder_path}"
+                    detail=f"Features folder not found: {content_based_dir_path}"
                 )
 
             # Validate combined features file
-            features_file = features_folder_path / "engineered_features.feather"
+            features_file = content_based_dir_path / "3_engineered_features.feather"
             if not features_file.exists():
                 raise HTTPException(
                     status_code=400,
@@ -51,12 +43,9 @@ class TrainingService:
                     detail="Feature dataset must contain only numeric columns for FAISS compatibility."
                 )
 
-            # Create the model folder if it doesn't exist
-            model_folder_path.mkdir(parents=True, exist_ok=True)
-
             # Initialize ModelTraining class and train the model
-            model_path = model_folder_path / "content_based_model.index"
-            model_trainer = ModelTraining(feature_matrix, str(model_path), metric)
+            model_path = content_based_dir_path / "4_content_based_model.index"
+            model_trainer = ModelTraining(feature_matrix, str(model_path))
             saved_model_path = model_trainer.apply_model_training()
 
             logger.info(f"Model training successful. Model saved at: {saved_model_path}")

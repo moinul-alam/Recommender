@@ -1,18 +1,121 @@
-from fastapi import APIRouter
+import logging
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Body, HTTPException, Query
+from src.config.content_based_config import ContentBasedConfigV2
+from src.config.collaborative_config import CollaborativeConfigV2
+from src.models.hybrid.v1.services.switching_recommendation_service import SwitchingRecommendationService
+from src.models.hybrid.v1.services.weighted_recommendation_service import WeighedRecommendationService
 
-hybrid_router = APIRouter()
 
-@hybrid_router.get("/data")
-async def load_data():
-    """
-    Load and display dataset information (e.g., number of records, columns).
-    """
-    # Placeholder logic for loading dataset
-    data_info = {
-        "rows": 183175,
-        "columns": 26,
-        "status": "Dataset loaded successfully."
-    }
-    return {"status": "success", "data": data_info, "message": "Data loaded"}
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-# Add other steps like preprocessing, feature engineering, etc., as separate endpoints later
+hybrid_router_v1 = APIRouter()
+
+content_based_dir_path = ContentBasedConfigV2().DIR_PATH
+collaborative_dir_path = CollaborativeConfigV2().DIR_PATH
+
+@hybrid_router_v1.post("/recommendations/weighted")
+def get_user_recommendations(
+    ratings: Dict[str, float] = Body(
+        ..., 
+        description="Dictionary of {tmdb_id: rating} pairs for user-based recommendation"
+    ),
+    request_data: List[Dict[str, Any]] = Body(
+        ..., 
+        description="List of {'tmdb_id': str, 'metadata': { ... }} objects for content-based recommendation"
+    ),
+    content_based_dir_path: str = Query(
+        default=str(content_based_dir_path),
+        description="Path to content-based model"
+    ),
+    collaborative_dir_path: str = Query(
+        default=str(collaborative_dir_path),
+        description="Path to collaborative model"
+    ),
+    n_recommendations: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
+    min_similarity: float = Query(
+        default=0.1,
+        ge=0.0,
+        le=1.0
+    )
+):
+    """Generate hybrid recommendations using user ratings and metadata."""
+
+    try:
+        if not ratings or not request_data:
+            raise HTTPException(status_code=400, detail="Ratings and data cannot be empty")
+
+        logger.info(f'Generating recommendations for {len(ratings)} rated items')
+
+        recommendations = WeighedRecommendationService.get_user_recommendations(
+            user_ratings=ratings,
+            request_data=request_data,
+            content_based_dir_path=content_based_dir_path,
+            collaborative_dir_path=collaborative_dir_path,
+            n_recommendations=n_recommendations,
+            min_similarity=min_similarity
+        )
+
+        if not recommendations:
+            logger.info("No recommendations found for the given ratings and metadata")
+            return {"message": "No recommendations found"}
+
+        logger.info(f"Generated {len(recommendations)} recommendations")
+        return recommendations
+
+    except Exception as e:
+        logger.error(f"Error generating recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@hybrid_router_v1.post("/recommendations/switching")
+def get_user_recommendations(
+    user_ratings: Dict[str, float] = Body(
+        ..., 
+        description="Dictionary of {tmdb_id: rating} pairs for user-based recommendation"
+    ),
+    content_based_dir_path: str = Query(
+        default=str(content_based_dir_path),
+        description="Path to content based model"
+    ),
+    collaborative_dir_path: str = Query(
+        default=str(collaborative_dir_path),
+        description="Path to collaborative model"
+    ),
+    n_recommendations: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
+    min_similarity: float = Query(
+        default=0.1,
+        ge=0.0,
+        le=1.0
+    )
+):
+    """Generate user-based recommendations using ratings given by a user."""
+    try:
+        logger.info(f'Generating user-based recommendations for {len(user_ratings)} rated items')
+
+        recommendations = SwitchingRecommendationService.get_user_recommendations(
+            user_ratings=user_ratings,
+            content_based_dir_path=content_based_dir_path,
+            collaborative_dir_path=collaborative_dir_path,
+            n_recommendations=n_recommendations,
+            min_similarity=min_similarity
+        )
+
+        if not recommendations:
+            logger.info("No recommendations found for the given user ratings")
+            return {"message": "No recommendations found"}
+
+        logger.info(f"Generated {len(recommendations)} user-based recommendations")
+        return recommendations
+
+    except Exception as e:
+        logger.error(f"Error generating user-based recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

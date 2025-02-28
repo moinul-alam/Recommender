@@ -9,3 +9,7 @@ pydantic-settings
 pathlib
 pyarrow
 matplotlib
+scipy
+memory_profiler
+psutil
+h5py

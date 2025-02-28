@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 import logging
-from src.models.collaborative.v2.pipeline.Recommender import Recommender
+from src.models.collaborative.v2.pipeline.Recommender import BaseRecommender
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class RecommendationService:
 
             # Step 5: Initialize recommender and log details
             logger.info("Initializing recommender")
-            recommender = Recommender(
+            recommender = BaseRecommender(
                 faiss_index=faiss_index,
                 item_matrix=item_matrix,
                 svd_model=svd_model,

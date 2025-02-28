@@ -9,24 +9,24 @@ from src.models.collaborative.v2.pipeline.ModelTraining import ModelTraining
 class ModelTrainingService:
     @staticmethod
     def train_model(
-        processed_dir_path: str, 
-        model_dir_path: str,
+        collaborative_dir_path: str,
         n_neighbors: Optional[int] = 50,
-        similarity_metric: str = 'L2',
-        batch_size: int = 10000,
+        similarity_metric: str = 'cosine',
+        batch_size: int = 50000,
         min_similarity: float = 0.1
     ) -> Optional[Dict[str, str]]:
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
 
         try:
-            # Validate and prepare input paths
-            processed_path = pathlib.Path(processed_dir_path)
-            model_path = pathlib.Path(model_dir_path)
-            model_path.mkdir(parents=True, exist_ok=True)
+            # Validate input paths
+            collaborative_dir_path = pathlib.Path(collaborative_dir_path)
+            if not collaborative_dir_path.exists():
+                logger.error(f"Collaborative directory not found: {collaborative_dir_path}")
+                return None
 
             # Load user-item matrix
-            user_item_matrix_path = processed_path / "user_item_matrix.pkl"
+            user_item_matrix_path = collaborative_dir_path / "2_user_item_matrix.pkl"
             if not user_item_matrix_path.exists():
                 logger.error(f"User-item matrix not found: {user_item_matrix_path}")
                 return None
@@ -36,24 +36,31 @@ class ModelTrainingService:
 
             logger.info(f"Loaded user-item matrix with shape: {user_item_matrix.shape}")
 
-            # Train model on the full dataset
+            # Initialize ModelTraining for FlatIP
             trainer = ModelTraining(
                 n_neighbors=n_neighbors, 
                 similarity_metric=similarity_metric,
                 batch_size=batch_size,
                 min_similarity=min_similarity,
                 use_disk_index=True,
-                index_path=model_path / "faiss_index.ivf"
+                n_components_user=300,
+                n_components_item=300,
+                user_index_path=str(collaborative_dir_path / "3_faiss_user_index.flat"),
+                item_index_path=str(collaborative_dir_path / "3_faiss_item_index.flat")
             )
 
-            model_components, faiss_index = trainer.train(user_item_matrix)
+            # Train model
+            model_results, faiss_indices = trainer.train(user_item_matrix)
 
             # Define output paths
             paths = {
-                "item_matrix": model_path / "item_matrix.pkl",
-                "svd_model": model_path / "svd_model.pkl",
-                "model_info": model_path / "model_info.pkl",
-                "faiss_index": model_path / "faiss_index.ivf"
+                "user_matrix": collaborative_dir_path / "3_user_matrix.pkl",
+                "item_matrix": collaborative_dir_path / "3_item_matrix.pkl",
+                "svd_user_model": collaborative_dir_path / "3_svd_user_model.pkl",
+                "svd_item_model": collaborative_dir_path / "3_svd_item_model.pkl",
+                "model_info": collaborative_dir_path / "3_model_info.pkl",
+                "faiss_user_index": collaborative_dir_path / "3_faiss_user_index.flat",
+                "faiss_item_index": collaborative_dir_path / "3_faiss_item_index.flat"
             }
 
             # Save model components
@@ -61,11 +68,13 @@ class ModelTrainingService:
                 with open(path, "wb") as f:
                     pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-            safe_pickle_dump(model_components['item_matrix'], paths["item_matrix"])
-            safe_pickle_dump(model_components['svd_model'], paths["svd_model"])
-            safe_pickle_dump(model_components['model_info'], paths["model_info"])
+            safe_pickle_dump(model_results['user_matrix'], paths["user_matrix"])
+            safe_pickle_dump(model_results['item_matrix'], paths["item_matrix"])
+            safe_pickle_dump(model_results['svd_user_model'], paths["svd_user_model"])
+            safe_pickle_dump(model_results['svd_item_model'], paths["svd_item_model"])
+            safe_pickle_dump(model_results['model_info'], paths["model_info"])
 
-            logger.info(f"Item-Item model training complete. Files saved in {model_path}")
+            logger.info(f"Model training complete. Files saved in {paths}")
             return {str(k): str(v) for k, v in paths.items()}
 
         except Exception as e:
