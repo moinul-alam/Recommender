@@ -59,7 +59,7 @@ class WeighedRecommendationService:
                 content_recommendations: RecommendationResponse = RecommendationService.recommendation_service(
                     recommendation_request=recommendation_request,
                     content_based_dir_path=content_based_dir_path,
-                    n_items=10
+                    n_items=n_recommendations
                 )
 
                 if not hasattr(content_recommendations, "similarMedia"):

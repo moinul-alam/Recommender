@@ -31,10 +31,12 @@ class BaseRecommender:
             if self.item_mapping.get(tmdb_id) is not None
         ]
 
-    def _convert_distance_to_similarity(self, distance: float, max_distance: float) -> float:
-        """Converts FAISS distance to a similarity percentage."""
-        return max(0, min(100, (1 - (distance / max_distance)) * 100))
-
+    # def _convert_distance_to_similarity(self, distance: float, max_distance: float) -> float:
+    #     """Converts FAISS distance to a similarity percentage."""
+    #     return max(0, min(100, (1 - (distance / max_distance)) * 100))
+    def _convert_distance_to_similarity(self, inner_product: float) -> float:
+        """Converts FAISS inner product to a similarity percentage."""
+        return max(0, min(100, (inner_product + 1) * 50))
 
 class UserRecommender(BaseRecommender):
     """Generates recommendations based on user similarity (collaborative filtering)."""
@@ -112,7 +114,7 @@ class UserRecommender(BaseRecommender):
                     continue
 
                 # Convert distance to similarity score
-                user_similarity = self._convert_distance_to_similarity(D[0][i], max_distance)
+                user_similarity = self._convert_distance_to_similarity(D[0][i])
 
                 # Only consider users above the similarity threshold
                 if user_similarity < self.min_similarity:
@@ -197,7 +199,7 @@ class ItemRecommender(BaseRecommender):
             for idx, dist in zip(I[0], D[0]):
                 if idx >= 0 and idx not in query_items_set and dist >= self.min_similarity:
                     similar_tmdb_id = self.item_reverse_mapping.get(idx)
-                    similarity_score = self._convert_distance_to_similarity(dist, max_distance)
+                    similarity_score = self._convert_distance_to_similarity(dist)
 
                     recommendations.append({
                         "tmdb_id": int(similar_tmdb_id),
@@ -207,7 +209,7 @@ class ItemRecommender(BaseRecommender):
                     if len(recommendations) == n_recommendations:
                         break
 
-            return sorted(recommendations, key=lambda x: x["similarity"], reverse=False)
+            return sorted(recommendations, key=lambda x: x["similarity"], reverse=True)
 
         except Exception as e:
             logger.error(f"Error in generating item recommendations: {str(e)}")

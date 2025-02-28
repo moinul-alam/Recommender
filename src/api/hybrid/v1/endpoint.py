@@ -74,13 +74,17 @@ def get_user_recommendations(
 
 @hybrid_router_v1.post("/recommendations/switching")
 def get_user_recommendations(
-    user_ratings: Dict[str, float] = Body(
+    ratings: Dict[str, float] = Body(
         ..., 
         description="Dictionary of {tmdb_id: rating} pairs for user-based recommendation"
     ),
+    request_data: List[Dict[str, Any]] = Body(
+        ..., 
+        description="List of {'tmdb_id': str, 'metadata': { ... }} objects for content-based recommendation"
+    ),
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),
-        description="Path to content based model"
+        description="Path to content-based model"
     ),
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
@@ -97,12 +101,17 @@ def get_user_recommendations(
         le=1.0
     )
 ):
-    """Generate user-based recommendations using ratings given by a user."""
+    """Generate hybrid recommendations using user ratings and metadata."""
+
     try:
-        logger.info(f'Generating user-based recommendations for {len(user_ratings)} rated items')
+        if not ratings or not request_data:
+            raise HTTPException(status_code=400, detail="Ratings and data cannot be empty")
+
+        logger.info(f'Generating recommendations for {len(ratings)} rated items')
 
         recommendations = SwitchingRecommendationService.get_user_recommendations(
-            user_ratings=user_ratings,
+            user_ratings=ratings,
+            request_data=request_data,
             content_based_dir_path=content_based_dir_path,
             collaborative_dir_path=collaborative_dir_path,
             n_recommendations=n_recommendations,
@@ -110,12 +119,12 @@ def get_user_recommendations(
         )
 
         if not recommendations:
-            logger.info("No recommendations found for the given user ratings")
+            logger.info("No recommendations found for the given ratings and metadata")
             return {"message": "No recommendations found"}
 
-        logger.info(f"Generated {len(recommendations)} user-based recommendations")
+        logger.info(f"Generated {len(recommendations)} recommendations")
         return recommendations
 
     except Exception as e:
-        logger.error(f"Error generating user-based recommendations: {str(e)}")
+        logger.error(f"Error generating recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
