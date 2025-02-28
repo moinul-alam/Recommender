@@ -96,7 +96,7 @@ def get_user_recommendations(
         le=100
     ),
     min_similarity: float = Query(
-        default=0.1,
+        default=0.000001,
         ge=0.0,
         le=1.0
     )
