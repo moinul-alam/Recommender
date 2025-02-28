@@ -28,22 +28,28 @@ class DataPreparation:
         """
         logger.info("Generating sequential IDs for items")
         
+        # Ensure sorting before ID assignment
+        df = df.sort_values(by=['tmdb_id', 'media_type']).reset_index(drop=True)
+
+        # Drop duplicate tmdb_id, media_type combinations
+        df = df.drop_duplicates(subset=['tmdb_id', 'media_type'])
+
         # Create mapping DataFrame
         mapping_df = df[['tmdb_id', 'media_type', 'title']].copy()
         mapping_df['item_id'] = range(1, len(mapping_df) + 1)
-        
+
         # Create a dictionary for faster mapping
         id_map = dict(zip(
             zip(mapping_df['tmdb_id'], mapping_df['media_type']), 
             mapping_df['item_id']
         ))
-        
+
         # Add new sequential IDs to original DataFrame
         df['item_id'] = df.apply(
             lambda row: id_map[(row['tmdb_id'], row['media_type'])], 
             axis=1
         )
-        
+
         logger.info(f"Generated {len(mapping_df)} unique sequential IDs")
         return df, mapping_df
 
@@ -68,7 +74,6 @@ class DataPreparation:
         except Exception as e:
             logger.error(f"Error loading JSON file: {e}")
             raise
-
     def extract_column_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Extract required features without preprocessing."""
         logger.info(f"Starting data extraction. Initial shape: {df.shape}")
@@ -131,7 +136,7 @@ class DataPreparation:
 
         logger.info(f"Data extraction completed. Final shape: {df.shape}")
         return df
-    
+
     def handle_missing_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Remove rows with missing `overview`, or `genres`."""
         logger.info("Handling missing data")
@@ -152,7 +157,7 @@ class DataPreparation:
             logger.info(f"Removed {removed_rows} rows with missing tmdb_id, overview, or genres")
 
         return df
-    
+
     def apply_data_preparation(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Applies full data extraction pipeline and generates sequential IDs.
@@ -164,7 +169,7 @@ class DataPreparation:
         try:
             df = self.load_dataset()
             df = self.extract_column_data(df)
-            df = self.handle_missing_data(df)
+            df = self.handle_missing_data(df)  # Ensure same dataset is used for mapping & preparation
             df, mapping_df = self.generate_sequential_ids(df)
             self.item_mapping = mapping_df
             logger.info("Data extraction and ID generation completed successfully.")
@@ -172,6 +177,7 @@ class DataPreparation:
         except Exception as e:
             logger.error(f"Error in data extraction: {e}")
             raise
+
 
     def prepare_new_data(self, df: pd.DataFrame) -> pd.DataFrame:
         try:
