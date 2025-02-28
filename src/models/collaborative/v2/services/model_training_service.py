@@ -43,8 +43,8 @@ class ModelTrainingService:
                 batch_size=batch_size,
                 min_similarity=min_similarity,
                 use_disk_index=True,
-                n_components_user=300,
-                n_components_item=300,
+                n_components_user=200,
+                n_components_item=200,
                 user_index_path=str(collaborative_dir_path / "3_faiss_user_index.flat"),
                 item_index_path=str(collaborative_dir_path / "3_faiss_item_index.flat")
             )

@@ -39,7 +39,7 @@ def execute_full_pipeline(
         description="Number of nearest neighbors to consider"
     ),
     similarity_metric: str = Query(
-        default='L2', 
+        default='cosine', 
         description="Similarity calculation method (euclidean/cosine)"
     ),
     batch_size: int = Query(

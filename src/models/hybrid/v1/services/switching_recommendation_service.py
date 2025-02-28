@@ -22,7 +22,6 @@ class SwitchingRecommendationService:
         try:
             logger.info(f"User ratings received: {user_ratings}")
 
-            # Convert user ratings to integer keys and float values
             try:
                 user_ratings = {int(key): float(value) for key, value in user_ratings.items()}
                 logger.info(f"Converted user ratings: {user_ratings}")
@@ -39,9 +38,8 @@ class SwitchingRecommendationService:
             
             # Try Item-Based Recommendations first
             try:
-                # Pass tmdb_ids directly as list of integers
                 item_recommendations = ItemRecommendationService.get_item_recommendations(
-                    items=tmdb_ids,  # Changed from item_request to tmdb_ids directly
+                    items=tmdb_ids,
                     collaborative_dir_path=collaborative_dir_path,
                     n_recommendations=n_recommendations,
                     min_similarity=min_similarity
@@ -60,7 +58,6 @@ class SwitchingRecommendationService:
                 
                 logger.info(f"Item-based recommendations found: {len(item_recommendations)}")
                 
-                # Process item-based scores
                 # Process item-based scores
                 item_scores = {}
                 for rec in item_recommendations:
@@ -100,7 +97,7 @@ class SwitchingRecommendationService:
                 
                 # Calculate user weight based on number of ratings, but cap at 0.5
                 weight_user = min(num_ratings / rating_threshold, 0.5)
-                weight_item = 0.5  # Item-based always gets 50% weight
+                weight_item = 1 - weight_user
                 
                 logger.info(f"Final weights - Item: {weight_item}, User: {weight_user}")
                 
@@ -163,7 +160,7 @@ class SwitchingRecommendationService:
                 rec_id = rec.tmdb_id
                 try:
                     similarity = float(rec.similarity)
-                    content_based_scores[rec_id] = max(content_based_scores[rec_id], similarity)  # Take max
+                    content_based_scores[rec_id] = max(content_based_scores[rec_id], similarity)
                 except ValueError:
                     logger.warning(f"Skipping invalid similarity value: {rec.similarity}")
         
