@@ -46,7 +46,7 @@ class SwitchingRecommendationService:
                 )
                 
                 # Check if item recommendations returned results
-                if not item_recommendations:
+                if not item_recommendations or len(item_recommendations) == 0:
                     logger.info("No item-based recommendations found (cold start). Falling back to content-based only.")
                     
                     # Use Content-Based Recommendations as fallback
@@ -56,42 +56,11 @@ class SwitchingRecommendationService:
                         n_recommendations=n_recommendations
                     )
                 
-                # Check if recommendations contain error message instead of actual recommendations
-                if isinstance(item_recommendations, dict) and "message" in item_recommendations:
-                    logger.info(f"Item-based returned message: {item_recommendations['message']}. Falling back to content-based only.")
-                    return SwitchingRecommendationService._get_content_based_recommendations(
-                        metadata_dict=metadata_dict,
-                        content_based_dir_path=content_based_dir_path,
-                        n_recommendations=n_recommendations
-                    )
-                
-                # Ensure we have a list of recommendations
-                if not isinstance(item_recommendations, list):
-                    logger.warning(f"Expected list of recommendations but got {type(item_recommendations)}. Converting if possible.")
-                    if isinstance(item_recommendations, dict):
-                        item_recommendations = [item_recommendations]
-                    else:
-                        logger.error(f"Cannot process item recommendations of type {type(item_recommendations)}")
-                        return SwitchingRecommendationService._get_content_based_recommendations(
-                            metadata_dict=metadata_dict,
-                            content_based_dir_path=content_based_dir_path,
-                            n_recommendations=n_recommendations
-                        )
-                
                 logger.info(f"Item-based recommendations found: {len(item_recommendations)}")
                 
                 # Process item-based scores
                 item_scores = {}
                 for rec in item_recommendations:
-                    # Skip any dict that doesn't have tmdb_id
-                    if not isinstance(rec, dict):
-                        logger.warning(f"Skipping non-dict recommendation: {rec}")
-                        continue
-                        
-                    if "message" in rec and "tmdb_id" not in rec:
-                        logger.warning(f"Skipping message instead of recommendation: {rec}")
-                        continue
-                        
                     if "tmdb_id" in rec:
                         if "predicted_rating" in rec:
                             item_scores[rec["tmdb_id"]] = rec["predicted_rating"]
@@ -103,15 +72,6 @@ class SwitchingRecommendationService:
                     else:
                         logger.warning(f"Skipping recommendation without tmdb_id: {rec}")
                 
-                # If no valid item scores were found, use content-based
-                if not item_scores:
-                    logger.info("No valid item scores extracted. Falling back to content-based only.")
-                    return SwitchingRecommendationService._get_content_based_recommendations(
-                        metadata_dict=metadata_dict,
-                        content_based_dir_path=content_based_dir_path,
-                        n_recommendations=n_recommendations
-                    )
-                
                 # Get User-Based Recommendations
                 user_recommendations = UserRecommendationService.get_user_recommendations(
                     user_ratings=user_ratings,
@@ -120,54 +80,12 @@ class SwitchingRecommendationService:
                     min_similarity=min_similarity
                 )
                 
-                # Check if user recommendations contain error message instead of actual recommendations
-                if isinstance(user_recommendations, dict) and "message" in user_recommendations:
-                    logger.info(f"User-based returned message: {user_recommendations['message']}. Using only item-based scores.")
-                    # Normalize and use only item scores
-                    item_scores = SwitchingRecommendationService._z_score_normalization(item_scores)
-                    ranked_recommendations = sorted(item_scores.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
-                    final_recommendations = [{"tmdb_id": rec_id, "score": score} for rec_id, score in ranked_recommendations]
-                    logger.info(f"Final item-only recommendations: {final_recommendations}")
-                    return final_recommendations
-                
-                # Ensure user_recommendations is a list
-                if not isinstance(user_recommendations, list):
-                    logger.warning(f"Expected list of user recommendations but got {type(user_recommendations)}. Converting if possible.")
-                    if isinstance(user_recommendations, dict):
-                        user_recommendations = [user_recommendations]
-                    else:
-                        logger.warning(f"Cannot process user recommendations of type {type(user_recommendations)}")
-                        # Use only item-based scores
-                        item_scores = SwitchingRecommendationService._z_score_normalization(item_scores)
-                        ranked_recommendations = sorted(item_scores.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
-                        final_recommendations = [{"tmdb_id": rec_id, "score": score} for rec_id, score in ranked_recommendations]
-                        logger.info(f"Final item-only recommendations: {final_recommendations}")
-                        return final_recommendations
-                
                 user_scores = {}
                 for rec in user_recommendations:
-                    # Skip any dict that doesn't have tmdb_id
-                    if not isinstance(rec, dict):
-                        logger.warning(f"Skipping non-dict user recommendation: {rec}")
-                        continue
-                        
-                    if "message" in rec and "tmdb_id" not in rec:
-                        logger.warning(f"Skipping message instead of user recommendation: {rec}")
-                        continue
-                        
                     if "tmdb_id" in rec and "predicted_rating" in rec:
                         user_scores[rec["tmdb_id"]] = rec["predicted_rating"]
                     else:
                         logger.warning(f"Skipping invalid user recommendation: {rec}")
-                
-                # If no valid user scores, use only item-based
-                if not user_scores:
-                    logger.info("No valid user scores extracted. Using only item-based scores.")
-                    item_scores = SwitchingRecommendationService._z_score_normalization(item_scores)
-                    ranked_recommendations = sorted(item_scores.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
-                    final_recommendations = [{"tmdb_id": rec_id, "score": score} for rec_id, score in ranked_recommendations]
-                    logger.info(f"Final item-only recommendations: {final_recommendations}")
-                    return final_recommendations
                 
                 # Normalize Scores (Z-score)
                 item_scores = SwitchingRecommendationService._z_score_normalization(item_scores)
@@ -271,51 +189,12 @@ class SwitchingRecommendationService:
             min_similarity=min_similarity
         )
         
-        # Handle case where collaborative_recommendations is a message instead of recommendations
-        if isinstance(collaborative_recommendations, dict) and "message" in collaborative_recommendations:
-            logger.info(f"Collaborative returned message: {collaborative_recommendations['message']}. Using only content-based.")
-            return SwitchingRecommendationService._get_content_based_recommendations(
-                metadata_dict=metadata_dict,
-                content_based_dir_path=content_based_dir_path,
-                n_recommendations=n_recommendations
-            )
-        
-        # Ensure collaborative_recommendations is a list
-        if not isinstance(collaborative_recommendations, list):
-            logger.warning(f"Expected list of collaborative recommendations but got {type(collaborative_recommendations)}. Converting if possible.")
-            if isinstance(collaborative_recommendations, dict):
-                collaborative_recommendations = [collaborative_recommendations]
-            else:
-                logger.warning(f"Cannot process collaborative recommendations of type {type(collaborative_recommendations)}")
-                return SwitchingRecommendationService._get_content_based_recommendations(
-                    metadata_dict=metadata_dict,
-                    content_based_dir_path=content_based_dir_path,
-                    n_recommendations=n_recommendations
-                )
-        
         collaborative_scores = {}
         for rec in collaborative_recommendations:
-            if not isinstance(rec, dict):
-                logger.warning(f"Skipping non-dict collaborative recommendation: {rec}")
-                continue
-                
-            if "message" in rec and "tmdb_id" not in rec:
-                logger.warning(f"Skipping message instead of collaborative recommendation: {rec}")
-                continue
-                
             if "tmdb_id" in rec and "predicted_rating" in rec:
                 collaborative_scores[rec["tmdb_id"]] = rec["predicted_rating"]
             else:
                 logger.warning(f"Skipping invalid collaborative recommendation: {rec}")
-        
-        # If no valid collaborative scores, use only content-based
-        if not collaborative_scores:
-            logger.info("No valid collaborative scores extracted. Using only content-based.")
-            return SwitchingRecommendationService._get_content_based_recommendations(
-                metadata_dict=metadata_dict,
-                content_based_dir_path=content_based_dir_path,
-                n_recommendations=n_recommendations
-            )
         
         # Get Content-Based Recommendations (IndexFlatIP)
         content_based_scores = defaultdict(float)
