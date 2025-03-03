@@ -18,7 +18,7 @@ class DataPreprocessing:
                  keep_columns: List[str] = None, df: Optional[pd.DataFrame] = None):
         self.segment_size = segment_size
         self.keep_columns = keep_columns or [
-            'item_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average',
+            'tmdb_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average',
             'release_year', 'genres', 'director', 'cast', 'keywords' 
         ]
         self.dataset_path = dataset_path
@@ -55,15 +55,33 @@ class DataPreprocessing:
         return self.df.copy()
 
     def handle_missing_or_duplicate_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove rows with missing or duplicate `item_id`, `overview`, or `genres`."""
+        """Remove rows with missing or duplicate `tmdb_id`, `overview`, or `genres`."""
         initial_rows = len(df)
         
         # Drop rows where any of these columns are missing
-        df = df.dropna(subset=['item_id', 'overview', 'genres'])
+        df = df.dropna(subset=['tmdb_id', 'overview', 'genres'])
+
+        # Drop duplicates based on `tmdb_id`
+        df = df.drop_duplicates(subset=['tmdb_id'])
 
         removed_rows = initial_rows - len(df)
         if removed_rows > 0:
-            logger.info(f"Removed {removed_rows} rows with missing or duplicate item_id, overview, or genres")
+            logger.info(f"Removed {removed_rows} rows with missing or duplicate tmdb_id, overview, or genres")
+
+        return df
+
+    def handle_tmdb_id(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Ensure tmdb_id is valid, numeric, and unique."""
+        initial_rows = len(df)
+
+        # Convert to numeric and drop invalid values
+        df['tmdb_id'] = pd.to_numeric(df['tmdb_id'], errors='coerce')
+        df = df.dropna(subset=['tmdb_id']).drop_duplicates(subset=['tmdb_id'])
+        df['tmdb_id'] = df['tmdb_id'].astype(int)
+
+        removed_rows = initial_rows - len(df)
+        if removed_rows > 0:
+            logger.info(f"Removed {removed_rows} rows with invalid or duplicate tmdb_id")
 
         return df
 
@@ -114,53 +132,45 @@ class DataPreprocessing:
         def preprocess_text(text: str) -> str:
             """Normalize general text fields by cleaning punctuation and extra spaces."""
             if pd.isna(text) or text == '':
-                return 'unknown' 
-            text = re.sub(r'[^\w\s]', '', str(text))
+                return 'Unknown'  # Explicitly assigning 'Unknown' for missing values
+            text = re.sub(r'[^\w\s,]', '', str(text))  # Remove punctuation except commas
             return ' '.join(text.lower().split())
 
         def process_list_field(field: str) -> str:
-            """Ensure lowercase transformation while keeping commas intact."""
-            if pd.isna(field) or field.strip() == '':
-                return 'unknown'
-            
-            # Lowercase and clean up the string (remove extra spaces around commas)
-            field = str(field).strip().lower()
-            field = re.sub(r'\s*,\s*', ',', field)
-            return field 
+            """Normalize list fields by replacing multiple delimiters and keeping commas, 
+            while cleaning up extra commas and spaces."""
+            if pd.isna(field) or field == '':
+                return 'Unknown'
+            # Replace other delimiters like '|' or ';' with a comma
+            field = str(field).replace('|', ',').replace(';', ',')
+            # Clean up extra commas and remove leading/trailing spaces
+            field = re.sub(r',\s*,', ',', field)  # Replace multiple commas with a single one
+            field = field.strip(', ')  # Remove leading and trailing commas and spaces
+            return ', '.join(field.lower().split())  # Maintain commas and normalize spaces
 
-        # Apply transformations for the list columns (genres, cast, director, keywords)
+
+        # Applying transformations for the list columns
         text_transformations: Dict[str, pd.Series] = {}
-        
-        # Process 'genres', 'cast', and 'director' (comma-separated, lowercase)
-        for col in ['genres', 'cast', 'director']:
+        for col in self.LIST_COLUMNS:
             if col in df.columns:
                 text_transformations[col] = df[col].apply(process_list_field)
-        
-        # Process 'keywords' (comma-separated, lowercase, tokenize)
-        def preprocess_keywords(keywords: str) -> str:
-            """Preprocess keywords by splitting on commas, lowercasing, and tokenizing."""
-            if pd.isna(keywords) or keywords == '':
-                return 'unknown'  # Replace missing or empty values with 'unknown'
-            keywords = keywords.lower()  # Convert to lowercase
-            keywords = re.sub(r'\s*,\s*', ',', keywords)  # Remove extra spaces around commas
-            keywords = keywords.split(',')  # Tokenize by splitting on commas
-            return ' '.join(keywords)  # Return tokenized, space-separated keywords string
 
-        # Apply the preprocessing for keywords
-        df['keywords'] = df['keywords'].apply(preprocess_keywords)
+        # Applying transformations for the full text columns (like overview)
+        for col in self.FULL_TEXT_COLUMNS:
+            if col in df.columns:
+                text_transformations[col] = df[col].apply(preprocess_text)
 
-        # Apply the transformations to genres, cast, director
+        # Assigning the transformed columns back to the dataframe
         df = df.assign(**text_transformations)
 
-        # Log any replacements of missing values with 'unknown'
+        # Log any replacements of missing values with 'Unknown'
         for col, transformed_series in text_transformations.items():
-            empty_count = (transformed_series == 'unknown').sum()
+            empty_count = (transformed_series == 'Unknown').sum()
             if empty_count > 0:
-                logger.info(f"Replaced {empty_count} missing values in {col} with 'unknown'")
+                logger.info(f"Replaced {empty_count} missing values in {col} with 'Unknown'")
 
         return df
 
-    
     def select_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Select and validate required columns."""
         logger.info('Selecting final columns.....')
@@ -169,7 +179,6 @@ class DataPreprocessing:
             logger.warning(f"Missing columns in dataset: {missing_cols}")
         
         available_cols = [col for col in self.keep_columns if col in df.columns]
-        logger.info(f"Selected columns: {available_cols}")
         return df[available_cols]
 
     def segment_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
@@ -185,6 +194,7 @@ class DataPreprocessing:
         try:
             df = self.load_dataset()
             df = self.handle_missing_or_duplicate_data(df)
+            df = self.handle_tmdb_id(df)
             df = self.handle_numeric_data(df)
             df = self.normalize_data(df)
             df = self.select_columns(df)

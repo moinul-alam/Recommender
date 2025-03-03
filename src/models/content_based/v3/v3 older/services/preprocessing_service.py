@@ -1,23 +1,28 @@
 import os
 from pathlib import Path
 from fastapi import HTTPException
-from src.models.content_based.v3.pipeline.DataPreprocessing import DataPreprocessing
+from src.models.content_based.v2.pipeline.DataPreprocessing import DataPreprocessing
 from src.schemas.content_based_schema import PipelineResponse
 
 class PreprocessingService:
     @staticmethod
-    def preprocess_data(content_based_dir_path: str, segment_size: int) -> PipelineResponse:
+    def preprocess_data(segment_size: int, prepared_folder_path: str, processed_folder_path: str) -> PipelineResponse:
         try:
             # Validate dataset path
-            content_based_dir_path=Path(content_based_dir_path)
+            prepared_folder_path=Path(prepared_folder_path)
+            processed_folder_path = Path(processed_folder_path)
 
-            if not content_based_dir_path.is_dir():
+            if not prepared_folder_path.is_dir():
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Processed folder not found: {content_based_dir_path}"
+                    detail=f"Processed folder not found: {prepared_folder_path}"
                 )
+        
+            # Validate or create processed folder path
+            if not os.path.isdir(processed_folder_path):
+                os.makedirs(processed_folder_path, exist_ok=True)
 
-            dataset_path = content_based_dir_path / "1_prepared_dataset.csv"
+            dataset_path = prepared_folder_path / "prepared_dataset.csv"
             if not dataset_path.exists():
                 raise HTTPException(
                     status_code=400,
@@ -29,18 +34,18 @@ class PreprocessingService:
             full_processed_dataset, processed_segments = data_preprocessor.apply_data_preprocessing()
 
             # Save processed segments
-            save_full_processed_dataset = os.path.join(content_based_dir_path, f"2_full_processed_dataset.csv")
+            save_full_processed_dataset = os.path.join(processed_folder_path, f"full_processed_dataset.csv")
             full_processed_dataset.to_csv(save_full_processed_dataset, index=False)
 
             for i, segment in enumerate(processed_segments):
-                segment_file = os.path.join(content_based_dir_path, f"2_processed_segment_{i + 1}.csv")
+                segment_file = os.path.join(processed_folder_path, f"processed_segment_{i + 1}.csv")
                 segment.to_csv(segment_file, index=False)
 
             # Return response
             return PipelineResponse(
                 status="Data preprocessed and saved successfully",
                 output=len(processed_segments),
-                output_path=str(content_based_dir_path)
+                output_path=str(processed_folder_path)
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error preprocessing data: {str(e)}")

@@ -1,239 +1,174 @@
 import os
-from pathlib import Path
 from typing import Dict, List, Optional
 import faiss
 import numpy as np
 import pandas as pd
 import logging
 from fastapi import HTTPException
-from sklearn.preprocessing import normalize
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class Recommender:
-    def __init__(self, 
-                 tmdb_id: int, 
+    def __init__(self, item_id: int, 
                  metadata: Optional[Dict], 
                  features_file: str, 
                  model_file: str, 
                  n_items: int,
-                 is_custom_query: Optional[bool] = False):
-        """
-        Initialize recommender with model and feature data.
-        
-        Args:
-            tmdb_id: ID of the movie to get recommendations for
-            metadata: Optional metadata for the movie
-            features_file: Path to engineered features feather file
-            model_file: Path to FAISS index file
-            n_items: Number of recommendations to return
-            is_custom_query: Whether this is a custom query for a new movie
-        """
-        self.tmdb_id = tmdb_id
+                 is_custom_query: Optional[bool]):
+        self.item_id = item_id
         self.metadata = metadata
-        self.features_file = Path(features_file)
-        self.model_file = Path(model_file)
+        self.features_file = features_file
+        self.model_file = model_file
         self.n_items = n_items
         self.is_custom_query = is_custom_query
-        
-        # Load data
-        self._load_data()
+        self.index = None
+        self._load_index()
+        self._load_feature_matrix()
 
-    def _load_data(self) -> None:
-        """Load FAISS index and feature matrix."""
+    def _load_index(self):
+        """Load FAISS index from file."""
+        if not os.path.isfile(self.model_file):
+            raise FileNotFoundError(f"FAISS index file not found: {self.model_file}")
+        
         try:
-            # Load FAISS index
-            if not self.model_file.is_file():
-                raise FileNotFoundError(f"FAISS index not found: {self.model_file}")
-            self.index = faiss.read_index(str(self.model_file))
-            
-            # Load feature matrix
-            if not self.features_file.is_file():
-                raise FileNotFoundError(f"Feature matrix not found: {self.features_file}")
+            logger.info(f"Loading FAISS index from file: {self.model_file}")
+            self.index = faiss.read_index(self.model_file)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load FAISS index: {str(e)}")
+    
+    def _load_feature_matrix(self):
+        """Load feature matrix from feather file."""
+        if not os.path.isfile(self.features_file):
+            raise FileNotFoundError(f"Feature Matrix file not found: {self.features_file}")
+        
+        try:
+            logger.info(f"Loading Feature Matrix from file: {self.features_file}")
             self.feature_matrix = pd.read_feather(self.features_file)
             self.feature_matrix = self.feature_matrix.reset_index(drop=True)
             
             if self.feature_matrix.empty:
-                raise ValueError("Feature matrix is empty")
-                
-            # Validate feature matrix structure
-            if 'tmdb_id' not in self.feature_matrix.columns:
-                raise ValueError("Feature matrix must contain tmdb_id column")
+                raise ValueError("Loaded feature matrix is empty")
                 
             logger.debug(f"Feature matrix columns: {self.feature_matrix.columns.tolist()}")
             
         except Exception as e:
-            logger.error(f"Error loading data: {str(e)}")
-            raise RuntimeError(f"Failed to load recommendation data: {str(e)}")
+            raise RuntimeError(f"Failed to load Feature Matrix: {str(e)}")
 
-    def _get_feature_vector(self, features: pd.DataFrame) -> np.ndarray:
-        """
-        Process feature vector for querying.
-        
-        Args:
-            features: DataFrame containing feature vector
-            
-        Returns:
-            Normalized feature vector as numpy array
-        """
-        # Extract feature columns (excluding tmdb_id)
-        feature_cols = [col for col in features.columns if col != 'tmdb_id']
-        
-        # Convert to numpy and ensure float32
-        vector = features[feature_cols].values.astype(np.float32)
-        
-        # Reshape if needed
-        if vector.ndim == 1:
-            vector = vector.reshape(1, -1)
-            
-        # Normalize for cosine similarity
-        return normalize(vector, norm='l2', axis=1)
-
-    def _convert_distances_to_similarities(self, distances: np.ndarray) -> np.ndarray:
-        """
-        Convert cosine distances to similarity percentages.
-        
-        Args:
-            distances: Array of cosine distances from FAISS
-            
-        Returns:
-            Array of similarity scores
-        """
-        # For cosine similarity, convert inner product to percentage
-        return (distances + 1) / 2 * 100
-
-    def _process_recommendations(self, 
-                               distances: np.ndarray, 
-                               indices: np.ndarray, 
-                               tmdb_ids: np.ndarray) -> List[Dict]:
-        """
-        Process FAISS results into recommendation format.
-        
-        Args:
-            distances: Array of distances from FAISS
-            indices: Array of indices from FAISS
-            tmdb_ids: Array of all tmdb_ids
-            
-        Returns:
-            List of recommendation dictionaries
-        """
-        recommendations = []
-        similarities = self._convert_distances_to_similarities(distances)
+    def _process_recommendations(self, distances, indices, item_id_all) -> List[Dict]:
+        """Process FAISS results into a recommendation list with L2 distance scores."""
+        similar_media = []
         
         for i, idx in enumerate(indices):
             try:
                 idx = int(idx)
-                similar_id = int(tmdb_ids[idx])
+                similar_media_id = int(item_id_all[idx])
                 
-                # Skip if it's the query movie itself
-                if similar_id == self.tmdb_id:
+                if similar_media_id == self.item_id:
                     continue
-                    
-                recommendations.append({
-                    'tmdb_id': similar_id,
-                    'similarity': f"{similarities[i]:.2f}%",
-                    'raw_score': float(distances[i])
+   
+                similarity_score = distances[i] 
+                similar_media.append({
+                    'item_id': similar_media_id,
+                    'similarity': str(similarity_score),
+                    'raw_score': float(similarity_score)
                 })
             except (IndexError, ValueError) as e:
                 logger.warning(f"Invalid index encountered: {idx} - {str(e)}")
                 continue
-                
-        return recommendations[:self.n_items]
+
+            logger.debug(f"Similar media: {similar_media}")
+        
+        logger.info(f"Found {len(similar_media)} similar media items")
+        
+        return similar_media[:self.n_items]
 
     def get_recommendation_for_existing(self) -> List[Dict]:
-        """Get recommendations for existing movie."""
+        """Retrieve recommendations for an existing movie in the dataset."""
         try:
-            # Get tmdb_ids and feature vectors
-            tmdb_ids = self.feature_matrix['tmdb_id'].values
-            features = self.feature_matrix[
-                [col for col in self.feature_matrix.columns if col != 'tmdb_id']
-            ]
-            
-            # Find query movie index
-            query_idx = np.where(tmdb_ids == self.tmdb_id)[0]
-            if len(query_idx) == 0:
-                raise HTTPException(
-                    status_code=404, 
-                    detail=f"tmdb_id {self.tmdb_id} not found"
-                )
-                
-            # Get and normalize query vector
-            query_vector = self._get_feature_vector(features.iloc[query_idx])
-            
-            # Search index
-            distances, indices = self.index.search(query_vector, self.n_items + 1)
-            
-            return self._process_recommendations(distances[0], indices[0], tmdb_ids)
-            
-        except HTTPException:
-            raise
+            item_id_all = self.feature_matrix.iloc[:, 0].to_numpy()
+            features_all = self.feature_matrix.iloc[:, 1:].to_numpy().astype(np.float32)
+
+            query_idx = np.where(item_id_all == self.item_id)[0][0]
+            query_vector = features_all[query_idx].reshape(1, -1)
+
+            k = min(self.n_items + 1, len(item_id_all))
+            distances, indices = self.index.search(query_vector, k)
+
+            return self._process_recommendations(distances[0], indices[0], item_id_all)
+        
+        except IndexError:
+            logger.error(f"item_id {self.item_id} not found in the dataset", exc_info=True)
+            raise HTTPException(status_code=404, detail=f"item_id {self.item_id} not found")
         except Exception as e:
-            logger.error(f"Error getting recommendations: {str(e)}")
-            raise RuntimeError(f"Failed to generate recommendations: {str(e)}")
+            logger.error(f"Error in recommendation_for_existing: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Error generating recommendations: {str(e)}")
 
     def get_recommendation_for_new(self, new_features: pd.DataFrame) -> List[Dict]:
-        """Get recommendations for new movie."""
+        """Retrieve recommendations for a new movie not in the dataset."""
         try:
-            # Get all tmdb_ids
-            tmdb_ids = self.feature_matrix['tmdb_id'].values
-            
-            # Process query vector
-            query_vector = self._get_feature_vector(new_features)
-            
-            # Search index
-            distances, indices = self.index.search(query_vector, self.n_items)
-            
-            # Filter valid indices
-            valid_mask = indices[0] < len(tmdb_ids)
-            valid_indices = indices[0][valid_mask]
-            valid_distances = distances[0][valid_mask]
-            
-            # Get recommendations
-            recommendations = self._process_recommendations(
-                valid_distances, 
-                valid_indices, 
-                tmdb_ids
-            )
-            
-            # Update feature matrix and index if not custom query
-            if not self.is_custom_query:
-                self._update_feature_matrix_and_index(new_features)
-            
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"Error getting recommendations: {str(e)}")
-            raise RuntimeError(f"Failed to generate recommendations: {str(e)}")
+            item_id_all = self.feature_matrix.iloc[:, 0].to_numpy()
 
-    def _update_feature_matrix_and_index(self, new_features: pd.DataFrame) -> None:
-        """Update feature matrix and index with new movie."""
+            query_vector = new_features.iloc[:, 1:].to_numpy().astype(np.float32)
+            if query_vector.ndim == 1:
+                query_vector = query_vector.reshape(1, -1)
+
+            distances, indices = self.index.search(query_vector, self.n_items)
+
+            safe_indices = [idx.item() for idx in indices[0] if idx < len(item_id_all)]
+            safe_distances = distances[0][:len(safe_indices)]
+
+            recommendations = self._process_recommendations(
+                safe_distances, 
+                safe_indices, 
+                item_id_all
+            )
+
+            self._update_feature_matrix_and_index(new_features)
+
+            return recommendations
+
+        except Exception as e:
+            logger.error(f"Error in recommendation_for_new: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Error generating recommendations: {str(e)}")
+
+    def _update_feature_matrix_and_index(self, new_features: pd.DataFrame):
+        """Update the feature matrix and FAISS index with new movie data."""
         try:
-            new_tmdb_id = new_features.iloc[0, 0]
-            
-            # Skip if movie already exists
-            if new_tmdb_id in self.feature_matrix['tmdb_id'].values:
-                logger.info(f"tmdb_id {new_tmdb_id} already exists in index")
+            if self.is_custom_query:
+                logger.info('Custom Features adding skipped')
                 return
-                
-            # Clean up new features
+            
+            logger.info('Updating new feature in progress')
+            new_item_id = new_features.iloc[0, 0]
             new_features = new_features.loc[:, ~new_features.columns.str.contains('^Unnamed')]
             new_features = new_features.reset_index(drop=True)
+
+            logger.debug(f"New features columns: {new_features.columns.tolist()}")
             
-            # Update feature matrix
-            self.feature_matrix = pd.concat(
-                [self.feature_matrix, new_features], 
-                ignore_index=True
-            )
-            self.feature_matrix.to_feather(self.features_file)
-            
-            # Update index
-            new_vector = self._get_feature_vector(new_features)
-            self.index.add(new_vector)
-            faiss.write_index(self.index, str(self.model_file))
-            
-            logger.info(f"Successfully added new movie {new_tmdb_id}")
-            
+            if new_item_id not in self.feature_matrix.iloc[:, 0].values:
+                self.feature_matrix = pd.concat([self.feature_matrix, new_features], 
+                                            ignore_index=True)
+                self.feature_matrix.reset_index(drop=True, inplace=True)
+                self.feature_matrix.to_feather(self.features_file)
+
+                new_vector = new_features.iloc[:, 1:].to_numpy().astype(np.float32)
+                if new_vector.ndim == 1:
+                    new_vector = new_vector.reshape(1, -1)
+
+                if new_vector.size == 0 or np.isnan(new_vector).any():
+                    raise ValueError(f"Invalid new vector for item_id {new_item_id}")
+
+                if self.index is None:
+                    raise RuntimeError("FAISS index is not initialized.")
+
+                self.index.add(new_vector)
+                faiss.write_index(self.index, self.model_file)
+
+                logger.info(f"Successfully added new vector for item_id {new_item_id} to index")
+            else:
+                logger.info(f"item_id {new_item_id} already exists in index")
+
         except Exception as e:
-            logger.error(f"Error updating index: {str(e)}")
-            raise RuntimeError(f"Failed to update index: {str(e)}")
+            logger.error(f"Error updating feature matrix and index: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Error updating index: {str(e)}")
