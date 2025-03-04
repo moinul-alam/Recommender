@@ -18,6 +18,7 @@ class FeatureEngineering:
         self,
         max_cast_members: int = 20,
         max_directors: int = 3,
+        weights: Optional[Dict[str, float]] = None,
     ):
         """Initialize feature engineering with configurable parameters."""
         logger.info("Initializing FeatureEngineering")
@@ -25,6 +26,15 @@ class FeatureEngineering:
         self.max_cast_members = max_cast_members
         self.max_directors = max_directors
         self.is_fitted = False
+        
+        self.weights = weights or {
+            "overview": 0.50,
+            "genres": 0.40,
+            "keywords": 0.04,
+            "cast": 0.04, 
+            "director": 0.02
+        }
+        self._validate_weights()
         
         # Initialize transformers
         self.mlb_genres = MultiLabelBinarizer(sparse_output=True)
@@ -43,6 +53,17 @@ class FeatureEngineering:
         
         logger.info("FeatureEngineering initialized successfully")
 
+    def _validate_weights(self) -> None:
+        """Validate feature weights."""
+        if not isinstance(self.weights, dict):
+            raise TypeError("Weights must be a dictionary")
+        
+        if not all(isinstance(v, (int, float)) for v in self.weights.values()):
+            raise TypeError("All weights must be numeric")
+            
+        if not np.isclose(sum(self.weights.values()), 1.0):
+            raise ValueError("Weights must sum to 1.0")
+    
     def fit_transformers(self, df: pd.DataFrame) -> None:
         """Fit all transformers on the full dataset."""
         try:
@@ -113,7 +134,11 @@ class FeatureEngineering:
             
             # Combine all features into a single sparse matrix
             combined_matrix = sparse.hstack([
-                overview_matrix, genres_matrix, keywords_matrix, cast_matrix, director_matrix
+                overview_matrix * self.weights['overview'],
+                keywords_matrix * self.weights['keywords'],
+                genres_matrix * self.weights['genres'],
+                cast_matrix * self.weights['cast'],
+                director_matrix * self.weights['director']
             ])
             
             # Get item IDs
@@ -151,6 +176,15 @@ class FeatureEngineering:
         logger.info(f"Saving transformers to: {path}")
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
+        
+        config = {
+            'weights': self.weights,
+            'max_cast_members': self.max_cast_members,
+            'max_directors': self.max_directors,
+            'is_fitted': self.is_fitted
+        }
+        joblib.dump(config, path / "3_config.pkl")
+        logger.info("Transformers saved successfully")
         
         transformers = {
             'tfidf_overview': self.tfidf_overview,

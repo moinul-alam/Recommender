@@ -124,7 +124,7 @@ async def train_model(
 """
 Index Creation
 """
-@content_based_router_v2.post("/index-creati")
+@content_based_router_v2.post("/index-creation")
 async def create_index(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),
@@ -132,7 +132,7 @@ async def create_index(
     )
 ):
     try:
-        return TrainingService.train_model(
+        return IndexingService.create_index(
             content_based_dir_path=content_based_dir_path
         )
     except Exception as e:
