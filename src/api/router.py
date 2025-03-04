@@ -1,16 +1,16 @@
 from fastapi import APIRouter
-from src.api.content_based.v1.endpoint import content_based_router_v1
+# from src.api.content_based.v1.endpoint import content_based_router_v1
 from src.api.content_based.v2.endpoint import content_based_router_v2
-from src.api.content_based.v3.endpoint import content_based_router_v3
+# from src.api.content_based.v3.endpoint import content_based_router_v3
 
-from src.api.collaborative.v1.endpoint import collaborative_router_v1
+# from src.api.collaborative.v1.endpoint import collaborative_router_v1
 from src.api.collaborative.v2.endpoint import collaborative_router_v2
 from src.api.collaborative.v3.endpoint import collaborative_router_v3
 from src.api.hybrid.v1.endpoint import hybrid_router_v1
 
 router = APIRouter()
 
-router.include_router(content_based_router_v3, prefix="/content-based/v3", tags=["Content-Based Recommender (Version 3: Sentence Transformers, FAISS)"])
+# router.include_router(content_based_router_v3, prefix="/content-based/v3", tags=["Content-Based Recommender (Version 3: Sentence Transformers, FAISS)"])
 router.include_router(content_based_router_v2, prefix="/content-based/v2", tags=["Content-Based Recommender (Version 2: TF-IDF, SVD, PCA, FAISS)"])
 router.include_router(collaborative_router_v2, prefix="/collaborative/v2", tags=["Collaborative Recommender (Version 2: SVD, FAISS)"])
 router.include_router(collaborative_router_v3, prefix="/collaborative/v3", tags=["Collaborative Recommender (Version 3: Matrix Factorization)"])

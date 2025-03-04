@@ -5,7 +5,7 @@ from src.models.content_based.v2.services.pipeline_service import PipelineServic
 from src.models.content_based.v2.services.preparation_service import PreparationService
 from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
 from src.models.content_based.v2.services.engineering_service import EngineeringService
-from src.models.content_based.v2.services.training_service import TrainingService
+from models.content_based.v2.services.indexing_service import IndexingService
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
 from src.models.content_based.v2.services.discovery_service import DiscoveryService
 from src.models.content_based.v2.services.evaluation_service import EvaluationService
@@ -108,6 +108,24 @@ Model Training
 """
 @content_based_router_v2.post("/model-training")
 async def train_model(
+    content_based_dir_path: str = Query(
+        default=str(content_based_dir_path),
+        description="Path to the folder containing feature-engineered datasets."
+    )
+):
+    try:
+        return IndexingService.create_index(
+            content_based_dir_path=content_based_dir_path
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during model training: {str(e)}")
+    
+
+"""
+Index Creation
+"""
+@content_based_router_v2.post("/index-creati")
+async def create_index(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),
         description="Path to the folder containing feature-engineered datasets."

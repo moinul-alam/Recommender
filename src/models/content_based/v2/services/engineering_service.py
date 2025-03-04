@@ -1,8 +1,11 @@
 import pandas as pd
+import numpy as np
 import logging
 from pathlib import Path
 import gc
 from fastapi import HTTPException
+from scipy import sparse
+import json
 from src.models.content_based.v2.pipeline.FeatureEngineering import FeatureEngineering
 from src.schemas.content_based_schema import PipelineResponse
 
@@ -12,9 +15,7 @@ logger.setLevel(logging.INFO)
 
 class EngineeringService:
     @staticmethod
-    def engineer_features(
-        content_based_dir_path: str
-    ) -> PipelineResponse:
+    def engineer_features(content_based_dir_path: str) -> PipelineResponse:
         try:
             # Initialize paths
             content_based_dir_path = Path(content_based_dir_path)
@@ -27,45 +28,80 @@ class EngineeringService:
             feature_engineer.save_transformers(content_based_dir_path)
 
             # Process individual segments
-            featured_segments = []
             segment_files = sorted(
                 content_based_dir_path.glob("2_processed_segment_*.csv"),
                 key=lambda x: int(x.stem.split("_")[-1])
             )
 
-            # Process each segment
-            for file in segment_files:
+            # Track segment metadata
+            segment_metadata = []
+            sparse_matrices = []
+            all_item_ids = []
+            
+            # Process each segment independently
+            for idx, file in enumerate(segment_files):
                 df = pd.read_csv(file)
-                print(f"<--------------------Processing segment: {file.stem}-------------------->")
-                engineered_df = feature_engineer.transform_features(df)
+                logger.info(f"Processing segment: {file.stem}")
+
+                # Get item IDs and sparse matrix
+                item_ids, sparse_matrix = feature_engineer.transform_features_sparse(df.copy())
                 
-                # Save intermediate result
-                save_path = content_based_dir_path / f"3_feature_engineering_{file.stem}.feather"
-                engineered_df.reset_index(drop=True).to_feather(save_path)
-                featured_segments.append(engineered_df)
+                # Generate file paths for segment outputs
+                segment_id = file.stem.split("_")[-1]
+                sparse_save_path = content_based_dir_path / f"3_feature_matrix_segment_{segment_id}.npz"
+                item_ids_save_path = content_based_dir_path / f"3_item_ids_segment_{segment_id}.npy"
+                
+                # Save sparse matrix in compressed format
+                sparse.save_npz(sparse_save_path, sparse_matrix)
+                np.save(item_ids_save_path, np.array(item_ids))  # Save item IDs
+
+                # Append to lists for final combination
+                sparse_matrices.append(sparse_matrix)
+                all_item_ids.extend(item_ids)
+
+                # Record metadata for this segment
+                segment_metadata.append({
+                    "segment_id": segment_id,
+                    "matrix_path": str(sparse_save_path),
+                    "item_ids_path": str(item_ids_save_path),
+                    "num_items": len(item_ids),
+                    "matrix_shape": sparse_matrix.shape
+                })
+                
+                del sparse_matrix, item_ids, df  # Free memory
                 gc.collect()
+            
+            # Combine all sparse matrices
+            final_sparse_matrix = sparse.vstack(sparse_matrices)
+            final_item_ids = np.array(all_item_ids)
 
-            # Combine all segments
-            final_path = content_based_dir_path / "3_engineered_features.feather"
+            # Save final combined matrices
+            final_sparse_path = content_based_dir_path / "3_final_feature_matrix.npz"
+            final_item_ids_path = content_based_dir_path / "3_final_item_ids.npy"
 
-            final_features = pd.concat(featured_segments, axis=0)
-            final_features = final_features.reset_index(drop=True)
+            sparse.save_npz(final_sparse_path, final_sparse_matrix)
+            np.save(final_item_ids_path, final_item_ids)
 
-            final_features.to_feather(final_path)
-
-            # Cleanup intermediate files
-            for file in content_based_dir_path.glob("2_processed_segment_*.csv"):
-                file.unlink(missing_ok=True)
-            for file in content_based_dir_path.glob("3_feature_engineering_*.feather"):
-                file.unlink(missing_ok=True)
-
+            # Save the segment metadata for the next step
+            metadata_path = content_based_dir_path / "3_engineered_features_metadata.json"
+            with open(metadata_path, 'w') as f:
+                json.dump({
+                    "num_segments": len(segment_metadata),
+                    "segments": segment_metadata,
+                    "total_items": final_sparse_matrix.shape[0],
+                    "final_matrix_path": str(final_sparse_path),
+                    "final_item_ids_path": str(final_item_ids_path),
+                    "final_matrix_shape": final_sparse_matrix.shape
+                }, f, indent=2)
+            
             return PipelineResponse(
                 status="Feature engineering completed successfully",
                 output=len(segment_files),
-                output_path=str(final_path)
+                output_path=str(metadata_path)
             )
 
         except Exception as e:
+            logger.error(f"Error in feature engineering: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, 
                 detail=f"Error in feature engineering: {str(e)}"
