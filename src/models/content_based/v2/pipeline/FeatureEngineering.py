@@ -42,13 +42,13 @@ class FeatureEngineering:
             max_features=1000, stop_words="english", ngram_range=(1, 2), min_df=3, dtype=np.float32, norm='l2'
         )
         self.tfidf_overview = TfidfVectorizer(
-            max_features=5000, stop_words="english", ngram_range=(1, 2), min_df=3, dtype=np.float32, norm='l2'
+            max_features=3000, stop_words="english", ngram_range=(1, 2), min_df=3, dtype=np.float32, norm='l2'
         )
         self.tfidf_cast = TfidfVectorizer(
-            max_features=2000, stop_words="english", ngram_range=(1, 1), min_df=2, dtype=np.float32, norm='l2'
+            max_features=1000, stop_words="english", ngram_range=(1, 1), min_df=2, dtype=np.float32, norm='l2'
         )
         self.tfidf_director = TfidfVectorizer(
-            max_features=500, stop_words="english", ngram_range=(1, 1), min_df=2, dtype=np.float32, norm='l2'
+            max_features=200, stop_words="english", ngram_range=(1, 1), min_df=2, dtype=np.float32, norm='l2'
         )
         
         logger.info("FeatureEngineering initialized successfully")

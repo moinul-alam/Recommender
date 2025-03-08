@@ -1,11 +1,12 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from src.config.content_based_config import ContentBasedConfigV2
-from src.models.content_based.v2.services.pipeline_service import PipelineService
+# from src.models.content_based.v2.services.pipeline_service import PipelineService
 from src.models.content_based.v2.services.preparation_service import PreparationService
 from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
 from src.models.content_based.v2.services.engineering_service import EngineeringService
-from models.content_based.v2.services.indexing_service import IndexingService
+from src.models.content_based.v2.services.model_training_service import ModelTrainingService
+# from models.content_based.v2.services.indexing_service import IndexingService
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
 from src.models.content_based.v2.services.discovery_service import DiscoveryService
 from src.models.content_based.v2.services.evaluation_service import EvaluationService
@@ -17,30 +18,30 @@ logging.basicConfig(level=logging.INFO)
 content_based_router_v2 = APIRouter()
 content_based_dir_path = ContentBasedConfigV2().DIR_PATH
 
-@content_based_router_v2.post("/execute-pipeline")
-async def execute_full_pipeline(
-    content_based_dir_path: str = Query(
-        default=str(content_based_dir_path),
-        description="Path to the dataset file"
-    ),
-    raw_dataset_name: str = Query(
-        default=str("coredb.media.json"),
-        description="Path to the raw dataset file (json)"
-    ),
-    segment_size: int = Query(
-        default=6000,
-        description="Number of rows per segment"
-    )
-):
-    try:
-        result = PipelineService.execute_full_pipeline(
-            content_based_dir_path=content_based_dir_path,
-            raw_dataset_name=raw_dataset_name,
-            segment_size=segment_size
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+# @content_based_router_v2.post("/execute-pipeline")
+# async def execute_full_pipeline(
+#     content_based_dir_path: str = Query(
+#         default=str(content_based_dir_path),
+#         description="Path to the dataset file"
+#     ),
+#     raw_dataset_name: str = Query(
+#         default=str("coredb.media.json"),
+#         description="Path to the raw dataset file (json)"
+#     ),
+#     segment_size: int = Query(
+#         default=6000,
+#         description="Number of rows per segment"
+#     )
+# ):
+#     try:
+#         result = PipelineService.execute_full_pipeline(
+#             content_based_dir_path=content_based_dir_path,
+#             raw_dataset_name=raw_dataset_name,
+#             segment_size=segment_size
+#         )
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
 
 """
 Data Preparation from raw data
@@ -114,7 +115,7 @@ async def train_model(
     )
 ):
     try:
-        return IndexingService.create_index(
+        return ModelTrainingService.train_model(
             content_based_dir_path=content_based_dir_path
         )
     except Exception as e:
