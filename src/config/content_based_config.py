@@ -2,6 +2,15 @@ from pathlib import Path
 from src.config.base_config import BaseConfig
 
 raw_dataset_name = "coredb.media.json"
+
+"""
+Version 4
+"""
+class ContentBasedConfigV4(BaseConfig):
+    @property
+    def DIR_PATH(self) -> Path:
+        return self.CONTENT_BASED_DATA_PATH_V4
+
 """
 Version 3
 """

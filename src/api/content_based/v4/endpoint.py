@@ -1,58 +1,59 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Request
-from src.config.content_based_config import ContentBasedConfigV2
-from src.models.content_based.v2.services.pipeline_service import PipelineService
-from src.models.content_based.v2.services.preparation_service import PreparationService
-from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
-from src.models.content_based.v2.services.engineering_service import EngineeringService
-from src.models.content_based.v2.services.training_service import TrainingService
-from src.models.content_based.v2.services.recommendation_service import RecommendationService
-from src.models.content_based.v2.services.discovery_service import DiscoveryService
-from src.models.content_based.v2.services.evaluation_service import EvaluationService
+from src.config.content_based_config import ContentBasedConfigV4
+# from src.models.content_based.v4.services.pipeline_service import PipelineService
+from src.models.content_based.v4.services.preparation_service import PreparationService
+from src.models.content_based.v4.services.preprocessing_service import PreprocessingService
+from src.models.content_based.v4.services.feature_engineering_service import FeatureEngineeringService
+from src.models.content_based.v4.services.model_training_service import ModelTrainingService
+# from models.content_based.v4.services.indexing_service import IndexingService
+from src.models.content_based.v4.services.recommendation_service import RecommendationService
+from src.models.content_based.v4.services.discovery_service import DiscoveryService
+from src.models.content_based.v4.services.evaluation_service import EvaluationService
 from src.schemas.content_based_schema import RecommendationRequest, EvaluationResponse
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-content_based_router_v2 = APIRouter()
-content_based_dir_path = ContentBasedConfigV2().DIR_PATH
+content_based_router_v4 = APIRouter()
+content_based_dir_path = ContentBasedConfigV4().DIR_PATH
 
-@content_based_router_v2.post("/execute-pipeline")
-async def execute_full_pipeline(
-    content_based_dir_path: str = Query(
-        default=str(content_based_dir_path),
-        description="Path to the dataset file"
-    ),
-    raw_dataset_name: str = Query(
-        default=str("coredb.media.json"),
-        description="Path to the raw dataset file (json)"
-    ),
-    segment_size: int = Query(
-        default=6000,
-        description="Number of rows per segment"
-    )
-):
-    try:
-        result = PipelineService.execute_full_pipeline(
-            content_based_dir_path=content_based_dir_path,
-            raw_dataset_name=raw_dataset_name,
-            segment_size=segment_size
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+# @content_based_router_v4.post("/execute-pipeline")
+# async def execute_full_pipeline(
+#     content_based_dir_path: str = Query(
+#         default=str(content_based_dir_path),
+#         description="Path to the dataset file"
+#     ),
+#     raw_dataset_name: str = Query(
+#         default=str("coredb.media.json"),
+#         description="Path to the raw dataset file (json)"
+#     ),
+#     segment_size: int = Query(
+#         default=6000,
+#         description="Number of rows per segment"
+#     )
+# ):
+#     try:
+#         result = PipelineService.execute_full_pipeline(
+#             content_based_dir_path=content_based_dir_path,
+#             raw_dataset_name=raw_dataset_name,
+#             segment_size=segment_size
+#         )
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
 
 """
 Data Preparation from raw data
 """
-@content_based_router_v2.post("/data-preparation")
+@content_based_router_v4.post("/data-preparation")
 async def prepare_data(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
         description="Path to the raw dataset file (json)"
     ),
     raw_dataset_name: str = Query(
-        default=str("coredb.media.json"),
+        default=str("1_coredb.media.json"),
         description="Path to the raw dataset file (json)"
     )
 ):
@@ -67,15 +68,15 @@ async def prepare_data(
 """
 Data Preprocessing
 """
-@content_based_router_v2.post("/data-preprocessing")
+@content_based_router_v4.post("/data-preprocessing")
 async def preprocess_data(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
         description="Path to the dataset file"
     ),
     segment_size: int = Query(
-        default=6000,
-        description="Number of rows per segment (default is 6000)"
+        default=10000,
+        description="Number of rows per segment (default is 10000)"
     )
 ):
     try:
@@ -89,7 +90,7 @@ async def preprocess_data(
 """
 Feature Engineering
 """
-@content_based_router_v2.post("/feature-engineering")
+@content_based_router_v4.post("/feature-engineering")
 async def engineer_features(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
@@ -97,7 +98,7 @@ async def engineer_features(
     ),
 ):
     try:
-        return EngineeringService.engineer_features(
+        return FeatureEngineeringService.engineer_features(
             content_based_dir_path=content_based_dir_path
         )
     except Exception as e:
@@ -106,7 +107,7 @@ async def engineer_features(
 """
 Model Training
 """
-@content_based_router_v2.post("/model-training")
+@content_based_router_v4.post("/model-training")
 async def train_model(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),
@@ -114,7 +115,25 @@ async def train_model(
     )
 ):
     try:
-        return TrainingService.train_model(
+        return ModelTrainingService.train_model(
+            content_based_dir_path=content_based_dir_path
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during model training: {str(e)}")
+    
+
+"""
+Index Creation
+"""
+@content_based_router_v4.post("/index-creation")
+async def create_index(
+    content_based_dir_path: str = Query(
+        default=str(content_based_dir_path),
+        description="Path to the folder containing feature-engineered datasets."
+    )
+):
+    try:
+        return IndexingService.create_index(
             content_based_dir_path=content_based_dir_path
         )
     except Exception as e:
@@ -123,7 +142,7 @@ async def train_model(
 """
 Recommendation
 """
-@content_based_router_v2.post("/similar")
+@content_based_router_v4.post("/similar")
 async def recommendations(
     request: Request,
     recommendation_request: RecommendationRequest,
@@ -135,7 +154,7 @@ async def recommendations(
 ):
     # body = await request.json()
     # logging.info(f"Raw request body: {body}")
-    logging.info(f"Sending Request to Content Based Recommendation Service V2")
+    logging.info(f"Sending Request to Content Based Recommendation Service V4")
     
     try:
         return RecommendationService.recommendation_service(
@@ -149,7 +168,7 @@ async def recommendations(
 """
 Discover media using custom query
 """
-@content_based_router_v2.post("/discover")
+@content_based_router_v4.post("/discover")
 async def discover_media(
     request: Request,
     recommendation_request: RecommendationRequest,
@@ -172,7 +191,7 @@ async def discover_media(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")
 
-@content_based_router_v2.post("/evaluate-index", response_model=EvaluationResponse)
+@content_based_router_v4.post("/evaluate-index", response_model=EvaluationResponse)
 async def evaluate_index(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),

@@ -20,6 +20,10 @@ class BaseConfig(BaseSettings):
         return self.BASE_DATA_PATH / "content_based" / "v3"
     
     @property
+    def CONTENT_BASED_DATA_PATH_V4(self) -> Path:
+        return self.BASE_DATA_PATH / "content_based" / "v4"
+    
+    @property
     def COLLABORATIVE_PATH_V1(self) -> Path:
         return self.BASE_DATA_PATH / "collaborative" / "v1"
     

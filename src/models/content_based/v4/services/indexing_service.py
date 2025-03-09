@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 from fastapi import HTTPException
-from models.content_based.v2.pipeline.IndexCreation import ModelTraining
+from models.content_based.v4.pipeline.IndexCreation import ModelTraining
 from src.schemas.content_based_schema import PipelineResponse
 
 logger = logging.getLogger(__name__)

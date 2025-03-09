@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import HTTPException
-from src.models.content_based.v2.pipeline.DataPreprocessing import DataPreprocessing
+from src.models.content_based.v4.pipeline.DataPreprocessing import DataPreprocessing
 from src.schemas.content_based_schema import PipelineResponse
 
 class PreprocessingService:
@@ -17,7 +17,7 @@ class PreprocessingService:
                     detail=f"Processed folder not found: {content_based_dir_path}"
                 )
 
-            dataset_path = content_based_dir_path / "1_prepared_dataset.csv"
+            dataset_path = content_based_dir_path / "2_prepared_dataset.csv"
             if not dataset_path.exists():
                 raise HTTPException(
                     status_code=400,
@@ -29,11 +29,11 @@ class PreprocessingService:
             full_processed_dataset, processed_segments = data_preprocessor.apply_data_preprocessing()
 
             # Save processed segments
-            save_full_processed_dataset = os.path.join(content_based_dir_path, f"2_full_processed_dataset.csv")
+            save_full_processed_dataset = os.path.join(content_based_dir_path, f"3_full_processed_dataset.csv")
             full_processed_dataset.to_csv(save_full_processed_dataset, index=False)
 
             for i, segment in enumerate(processed_segments):
-                segment_file = os.path.join(content_based_dir_path, f"2_processed_segment_{i + 1}.csv")
+                segment_file = os.path.join(content_based_dir_path, f"3_processed_segment_{i + 1}.csv")
                 segment.to_csv(segment_file, index=False)
 
             # Return response

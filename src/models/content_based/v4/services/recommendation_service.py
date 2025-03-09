@@ -3,12 +3,12 @@ import logging
 import joblib
 from pathlib import Path
 from fastapi import HTTPException
-from src.models.content_based.v2.pipeline.Recommender import Recommender
+from src.models.content_based.v4.pipeline.Recommender import Recommender
 from src.schemas.content_based_schema import Recommendation, RecommendationResponse, RecommendationRequest
-from src.models.content_based.v2.pipeline.DataPreparation import DataPreparation
-from src.models.content_based.v2.pipeline.NewDataPreparation import NewDataPreparation
-from src.models.content_based.v2.pipeline.DataPreprocessing import DataPreprocessing
-from src.models.content_based.v2.pipeline.FeatureEngineering import FeatureEngineering
+from src.models.content_based.v4.pipeline.DataPreparation import DataPreparation
+from src.models.content_based.v4.pipeline.NewDataPreparation import NewDataPreparation
+from src.models.content_based.v4.pipeline.DataPreprocessing import DataPreprocessing
+from src.models.content_based.v4.pipeline.FeatureEngineering import FeatureEngineering
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -80,7 +80,7 @@ class RecommendationService:
             )
 
             if is_existing:
-                logging.info(f'Existing media detected. Sending to Recommender Pipeline V2')
+                logging.info(f'Existing media detected. Sending to Recommender Pipeline V4')
                 recommendations = recommender.get_recommendation_for_existing()
             else:
                 logging.info(f'New media detected.')
