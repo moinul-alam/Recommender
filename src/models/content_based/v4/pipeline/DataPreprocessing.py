@@ -10,16 +10,29 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 class DataPreprocessing:
+    """
+    Pipeline layer for preprocessing data before feature engineering and model training.
+    Handles data cleaning, normalization, and segmentation.
+    """
+    # Class constants
     LIST_COLUMNS = ['media_type', 'title', 'spoken_languages', 'genres', 'keywords', 'director', 'cast']
     FULL_TEXT_COLUMNS = ['overview']
     NUMERIC_COLUMNS = ['vote_average', 'release_year']
 
     def __init__(self, dataset_path: Optional[str] = None, segment_size: int = 5000, 
                  keep_columns: List[str] = None, df: Optional[pd.DataFrame] = None):
+        """
+        Initialize the data preprocessing pipeline.
+        
+        Args:
+            dataset_path: Path to the dataset CSV file
+            segment_size: Size of each segment for processing large datasets
+            keep_columns: Columns to keep in the final dataset
+            df: Alternatively, provide a DataFrame directly instead of a path
+        """
         self.segment_size = segment_size
         self.keep_columns = keep_columns or [
-            'item_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average',
-            'release_year', 'genres', 'director', 'cast', 'keywords' 
+            'item_id', 'overview', 'genres', 'director', 'cast', 'keywords' 
         ]
         self.dataset_path = dataset_path
         self.df = df
@@ -29,30 +42,53 @@ class DataPreprocessing:
         
         if segment_size < 1:
             raise ValueError("segment_size must be at least 1")
+    
+    def process(self) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
+        """
+        Main method to execute the full preprocessing pipeline.
+        
+        Returns:
+            tuple: (Full processed DataFrame, List of dataset segments)
+        """
+        logger.info("Starting data preprocessing pipeline")
+        
+        # Load data
+        df = self._load_data()
+        
+        # Apply preprocessing steps
+        df = self.handle_missing_or_duplicate_data(df)
+        df = self.handle_numeric_data(df)
+        df = self.normalize_data(df)
+        df = self.select_columns(df)
+        
+        # Segment the dataset
+        df, segments = self.segment_dataset(df)
+        
+        # Free memory
+        gc.collect()
+        
+        logger.info("Data preprocessing completed successfully")
+        return df, segments
 
-    def load_dataset(self) -> pd.DataFrame:
-        """Load dataset from CSV file."""
-        if not Path(self.dataset_path).exists():
-            raise FileNotFoundError(f"File not found: {self.dataset_path}")
+    def _load_data(self) -> pd.DataFrame:
+        """Load data from either file path or DataFrame."""
+        if self.df is not None:
+            if not isinstance(self.df, pd.DataFrame):
+                raise TypeError("The provided data is not a pandas DataFrame.")
+            
+            logger.info(f"Using provided DataFrame with {len(self.df)} rows and {len(self.df.columns)} columns")
+            return self.df.copy()
+        else:
+            if not Path(self.dataset_path).exists():
+                raise FileNotFoundError(f"File not found: {self.dataset_path}")
 
-        try:
-            df = pd.read_csv(self.dataset_path)
-            logger.info(f"Loaded dataset with {len(df)} rows and {len(df.columns)} columns")
-            return df.copy()
-        except Exception as e:
-            logger.error(f"Error loading CSV file: {e}")
-            raise
-
-    def load_dataframe(self) -> pd.DataFrame:
-        """Load data from provided DataFrame."""
-        if self.df is None:
-            raise ValueError("DataFrame is not set. Please provide a valid DataFrame.")
-
-        if not isinstance(self.df, pd.DataFrame):
-            raise TypeError("The provided data is not a pandas DataFrame.")
-
-        logger.info(f"Loaded DataFrame with {len(self.df)} rows and {len(self.df.columns)} columns")
-        return self.df.copy()
+            try:
+                df = pd.read_csv(self.dataset_path)
+                logger.info(f"Loaded dataset from {self.dataset_path} with {len(df)} rows and {len(df.columns)} columns")
+                return df.copy()
+            except Exception as e:
+                logger.error(f"Error loading CSV file: {e}")
+                raise
 
     def handle_missing_or_duplicate_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Remove rows with missing or duplicate `item_id`, `overview`, or `genres`."""
@@ -106,10 +142,9 @@ class DataPreprocessing:
 
         return df
 
-
     def normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normalize text and list data while keeping commas intact for list fields."""
-        logger.info('Normalizing.....')
+        logger.info('Normalizing data...')
 
         def preprocess_text(text: str) -> str:
             """Normalize general text fields by cleaning punctuation and extra spaces."""
@@ -147,7 +182,8 @@ class DataPreprocessing:
             return ' '.join(keywords)  # Return tokenized, space-separated keywords string
 
         # Apply the preprocessing for keywords
-        df['keywords'] = df['keywords'].apply(preprocess_keywords)
+        if 'keywords' in df.columns:
+            text_transformations['keywords'] = df['keywords'].apply(preprocess_keywords)
 
         # Process 'overview' (lowercase, punctuation removed)
         if 'overview' in df.columns:
@@ -163,11 +199,10 @@ class DataPreprocessing:
                 logger.info(f"Replaced {empty_count} missing values in {col} with 'unknown'")
 
         return df
-
     
     def select_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Select and validate required columns."""
-        logger.info('Selecting final columns.....')
+        logger.info('Selecting final columns...')
         missing_cols = set(self.keep_columns) - set(df.columns)
         if missing_cols:
             logger.warning(f"Missing columns in dataset: {missing_cols}")
@@ -178,31 +213,18 @@ class DataPreprocessing:
 
     def segment_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
         """Segment dataset into smaller chunks using efficient np.array_split."""
-        num_segments = (len(df) // self.segment_size) + 1
+        num_segments = max(1, (len(df) + self.segment_size - 1) // self.segment_size)
         segments = np.array_split(df, num_segments)
 
-        logger.info(f"Created {len(segments)} segments of size {self.segment_size}")
+        logger.info(f"Created {len(segments)} segments of size ~{self.segment_size}")
         return df, segments
 
-    def apply_data_preprocessing(self) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
-        """Apply all data preprocessing steps to a new dataset."""
-        try:
-            df = self.load_dataset()
-            df = self.handle_missing_or_duplicate_data(df)
-            # df = self.handle_tmdb_id(df)
-            df = self.handle_numeric_data(df)
-            df = self.normalize_data(df)
-            df = self.select_columns(df)
-            df, segments = self.segment_dataset(df)
-
-            gc.collect()
-            return df, segments
-        except Exception as e:
-            logger.error(f"Error in data processing: {str(e)}")
-            raise
-
     def preprocess_new_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Preprocess new data from an existing DataFrame."""
+        """
+        Lightweight method to preprocess new data without segmentation.
+        Useful for online processing or small batches.
+        """
+        logger.info("Preprocessing new data...")
         try:
             df = self.handle_numeric_data(df)
             df = self.normalize_data(df)

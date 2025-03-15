@@ -7,10 +7,13 @@ from src.schemas.content_based_schema import PipelineResponse
 class PreprocessingService:
     @staticmethod
     def preprocess_data(content_based_dir_path: str, segment_size: int) -> PipelineResponse:
+        """
+        Service layer method responsible for file operations and orchestrating the data preprocessing process.
+        """
         try:
-            # Validate dataset path
-            content_based_dir_path=Path(content_based_dir_path)
+            content_based_dir_path = Path(content_based_dir_path)
 
+            # Validate input paths
             if not content_based_dir_path.is_dir():
                 raise HTTPException(
                     status_code=400, 
@@ -24,12 +27,12 @@ class PreprocessingService:
                     detail=f"Combined features dataset not found: {dataset_path}"
                 )
 
-            # Initialize data preprocessing
+            # Initialize and run preprocessing pipeline
             data_preprocessor = DataPreprocessing(dataset_path, segment_size)
-            full_processed_dataset, processed_segments = data_preprocessor.apply_data_preprocessing()
+            full_processed_dataset, processed_segments = data_preprocessor.process()
 
-            # Save processed segments
-            save_full_processed_dataset = os.path.join(content_based_dir_path, f"3_full_processed_dataset.csv")
+            # Save processed results
+            save_full_processed_dataset = os.path.join(content_based_dir_path, "3_full_processed_dataset.csv")
             full_processed_dataset.to_csv(save_full_processed_dataset, index=False)
 
             for i, segment in enumerate(processed_segments):
@@ -42,5 +45,7 @@ class PreprocessingService:
                 output=len(processed_segments),
                 output_path=str(content_based_dir_path)
             )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error preprocessing data: {str(e)}")
