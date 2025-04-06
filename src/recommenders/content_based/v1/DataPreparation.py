@@ -198,12 +198,7 @@ class DataPreparation:
             return PipelineResponse(
                 status="success",
                 message="Data preparation completed successfully",
-                details={
-                    "input_records": len(df),
-                    "output_records": len(df),
-                    "unique_items": len(mapping_df),
-                    "saved_files": saved_files
-                }
+                output_path=str(directory_path)
             )
         except Exception as e:
             logger.error(f"Error in data preparation: {e}")

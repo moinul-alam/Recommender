@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from src.config.config import BaseConfig
-from src.recommenders.content_based.v1 import DataPreparation
+from src.recommenders.content_based.v1.DataPreparation import DataPreparation
 
 from src.schemas.content_based_schema import PipelineResponse
 
