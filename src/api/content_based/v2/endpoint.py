@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Request
-from src.config.content_based_config import ContentBasedConfigV2
+from src.config.config import BaseConfig
 from src.models.content_based.v2.services.pipeline_service import PipelineService
 from src.models.content_based.v2.services.preparation_service import PreparationService
 from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
@@ -14,8 +14,14 @@ from src.schemas.content_based_schema import RecommendationRequest, EvaluationRe
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# content_based_router_v2 = APIRouter()
+# content_based_dir_path = ContentBasedConfigV2().DIR_PATH
+
+version = 2
+config = BaseConfig()
+content_based_dir_path = config.CONTENT_BASED_PATH / f"v{version}"
+logger.info(f"Using content-based directory: {content_based_dir_path}")
 content_based_router_v2 = APIRouter()
-content_based_dir_path = ContentBasedConfigV2().DIR_PATH
 
 @content_based_router_v2.post("/execute-pipeline")
 async def execute_full_pipeline(
@@ -24,7 +30,7 @@ async def execute_full_pipeline(
         description="Path to the dataset file"
     ),
     raw_dataset_name: str = Query(
-        default=str("coredb.media.json"),
+        default=str("1_coredb.media.json"),
         description="Path to the raw dataset file (json)"
     ),
     segment_size: int = Query(
