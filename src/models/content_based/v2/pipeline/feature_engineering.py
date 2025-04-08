@@ -7,7 +7,6 @@ from sklearn.feature_extraction import FeatureHasher
 from sklearn.preprocessing import normalize, MultiLabelBinarizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD, PCA
-import joblib
 from scipy import sparse
 from typing import Dict, List, Optional
 
@@ -18,49 +17,63 @@ logger.setLevel(logging.INFO)
 class FeatureEngineering:
     def __init__(
         self,
-        weights: Optional[Dict[str, float]] = None,
-        max_cast_members: int = 20,
-        max_directors: int = 3,
-        n_components_svd_overview: int = 300,
-        n_components_svd_keywords: int = 200,
-        n_components_pca: int = 300,
-        random_state: int = 42
+        model_components: Optional[Dict[str, int]] = None,
+        feature_weights: Optional[Dict[str, float]] = None,
     ):
         """Initialize feature engineering with configurable parameters."""
         logger.info("Initializing FeatureEngineering")
         
+        # Set default model components if not provided
+        self.model_components = model_components or {
+            "tfidf_overview_max_features": 5000,
+            "tfidf_keywords_max_features": 1000,
+            "max_cast_members": 20,
+            "max_directors": 3,
+            "n_components_svd_overview": 200,
+            "n_components_svd_keywords": 200,
+            "n_components_pca": 200,
+            "random_state": 42
+        }
+        
         # Set and validate weights
-        self.weights = weights or {
-            "overview": 0.45,
-            "genres": 0.40,
-            "keywords": 0.05,
-            "cast": 0.07, 
-            "director": 0.03
+        self.weights = feature_weights or {
+            "overview": 0.40,
+            "genres": 0.35,
+            "keywords": 0.10,
+            "cast": 0.10, 
+            "director": 0.05
         }
         self._validate_weights()
         
-        self.max_cast_members = max_cast_members
-        self.max_directors = max_directors
+        self.tfidf_overview = TfidfVectorizer(
+            max_features=self.model_components['tfidf_overview_max_features'],
+            stop_words="english",
+            ngram_range=(1, 2),
+            min_df=3,
+            dtype=np.float32,
+            norm='l2'
+        )
+        
+        self.tfidf_keywords = TfidfVectorizer(
+            max_features=self.model_components['tfidf_keywords_max_features'],
+            stop_words="english",
+            ngram_range=(1, 2),
+            min_df=3,
+            dtype=np.float32,
+            norm='l2'
+        )
+        
+        self.mlb_genres = MultiLabelBinarizer(sparse_output=True)
+        
+        self.max_cast_members = self.model_components['max_cast_members']
+        self.max_directors = self.model_components['max_directors']
         self.is_fitted = False
         
-        # Initialize transformers
-        self.mlb_genres = MultiLabelBinarizer(sparse_output=True)
-        self.tfidf_keywords = TfidfVectorizer(
-            max_features=1000,
-            stop_words="english",
-            ngram_range=(1, 2),
-            min_df=3,
-            dtype=np.float32,
-            norm='l2'
-        )
-        self.tfidf_overview = TfidfVectorizer(
-            max_features=5000,
-            stop_words="english",
-            ngram_range=(1, 2),
-            min_df=3,
-            dtype=np.float32,
-            norm='l2'
-        )
+        n_components_svd_overview = self.model_components['n_components_svd_overview']
+        n_components_svd_keywords = self.model_components['n_components_svd_keywords']
+        n_components_pca = self.model_components['n_components_pca']
+        random_state = self.model_components['random_state']
+        
         self.cast_hasher = FeatureHasher(n_features=1000, input_type='string')
         self.director_hasher = FeatureHasher(n_features=200, input_type='string')
         self.svd_overview = TruncatedSVD(n_components=n_components_svd_overview, random_state=random_state)
@@ -90,7 +103,6 @@ class FeatureEngineering:
         
         return cast_list[:self.max_cast_members]
 
-
     def _process_directors(self, director_str: str) -> list:
         """Process director string to get top N directors."""
         if pd.isna(director_str) or not director_str.strip():
@@ -100,7 +112,6 @@ class FeatureEngineering:
         director_list = [name.strip() for name in director_str.replace(';', ',').replace('|', ',').split(',')]
 
         return director_list[:self.max_directors]
-
 
     def _combine_sparse_features(self, features_list: List[sparse.csr_matrix], weights: List[float]) -> sparse.csr_matrix:
         """Combine sparse feature matrices with weights."""
@@ -238,67 +249,4 @@ class FeatureEngineering:
 
         except Exception as e:
             logger.error(f"Error transforming features: {str(e)}", exc_info=True)
-            raise
-
-    def save_transformers(self, path: str) -> None:
-        """Save all transformers to disk."""
-        if not self.is_fitted:
-            raise ValueError("Cannot save unfitted transformers")
-            
-        logger.info(f"Saving transformers to: {path}")
-        path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
-        
-        # Only save stateful transformers
-        transformers = {
-            '3_tfidf_overview': self.tfidf_overview,
-            '3_mlb_genres': self.mlb_genres,
-            '3_svd_overview': self.svd_overview,
-            '3_svd_keywords': self.svd_keywords,
-            '3_pca': self.pca,
-            '3_tfidf_keywords': self.tfidf_keywords,
-        }
-    
-        for name, transformer in transformers.items():
-            joblib.dump(transformer, path / f"{name}.pkl")
-        
-        # Save configuration
-        config = {
-            'weights': self.weights,
-            'max_cast_members': self.max_cast_members,
-            'max_directors': self.max_directors,
-            'is_fitted': self.is_fitted
-        }
-        joblib.dump(config, path / "3_config.pkl")
-        logger.info("Transformers saved successfully")
-
-    def load_transformers(self, path: str) -> None:
-        """Load all transformers from disk."""
-        logger.info(f"Loading transformers from: {path}")
-        path = Path(path)
-        
-        try:
-            # Load configuration
-            config = joblib.load(path / "3_config.pkl")
-            self.weights = config['weights']
-            self.max_cast_members = config['max_cast_members']
-            self.max_directors = config['max_directors']
-            self.is_fitted = config['is_fitted']
-            
-            # Load only stateful transformers
-            self.tfidf_overview = joblib.load(path / "3_tfidf_overview.pkl")
-            self.mlb_genres = joblib.load(path / "3_mlb_genres.pkl")
-            self.tfidf_keywords = joblib.load(path / "3_tfidf_keywords.pkl")
-            self.svd_overview = joblib.load(path / "3_svd_overview.pkl")
-            self.svd_keywords = joblib.load(path / "3_svd_keywords.pkl")
-            self.pca = joblib.load(path / "3_pca.pkl")
-            
-            # Reinitialize FeatureHashers (they are stateless)
-            self.cast_hasher = FeatureHasher(n_features=1000, input_type='string')
-            self.director_hasher = FeatureHasher(n_features=200, input_type='string')
-            
-            logger.info("Transformers loaded successfully")
-            
-        except Exception as e:
-            logger.error(f"Error loading transformers: {str(e)}", exc_info=True)
             raise

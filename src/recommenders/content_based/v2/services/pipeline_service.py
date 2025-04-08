@@ -1,8 +1,8 @@
 import os
 import logging
 from src.models.content_based.v2.services.data_preparation_service import DataPreparationService
-from src.models.content_based.v2.services.data_preprocessing_service import DataPreprocessingService
-from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
+from src.models.content_based.v2.services.data_preprocessing_service import PreprocessingService
+from src.models.content_based.v2.services.engineering_service import EngineeringService
 from src.models.content_based.v2.services.training_service import TrainingService
 from src.schemas.content_based_schema import PipelineResponse
 
@@ -40,13 +40,13 @@ class PipelineService:
             )
 
             # Step 2: Data Preprocessing
-            preprocessing_result = DataPreprocessingService.preprocess_data(
+            preprocessing_result = PreprocessingService.preprocess_data(
                 content_based_dir_path=content_based_dir_path,
                 segment_size=segment_size
             )
 
             # Step 3: Feature Engineering
-            feature_engineering_result = FeatureEngineeringService.engineer_features(
+            feature_engineering_result = EngineeringService.engineer_features(
                 content_based_dir_path=content_based_dir_path
             )
 

@@ -5,10 +5,10 @@ from pathlib import Path
 from fastapi import HTTPException
 from src.models.content_based.v2.pipeline.Recommender import Recommender
 from src.schemas.content_based_schema import Recommendation, RecommendationResponse, RecommendationRequest
-from src.models.content_based.v2.pipeline.DataPreparation import DataPreparation
+from src.models.content_based.v2.pipeline.data_preparation import DataPreparation
 from src.models.content_based.v2.pipeline.NewDataPreparation import NewDataPreparation
-from src.models.content_based.v2.pipeline.DataPreprocessing import DataPreprocessing
-from src.models.content_based.v2.pipeline.FeatureEngineering import FeatureEngineering
+from src.models.content_based.v2.pipeline.data_preprocessing import DataPreprocessing
+from src.models.content_based.v2.pipeline.feature_engineering import FeatureEngineering
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

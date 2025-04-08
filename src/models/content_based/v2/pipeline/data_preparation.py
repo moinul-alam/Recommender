@@ -15,8 +15,8 @@ keep_columns = [
 ]
 
 class DataPreparation:
-    def __init__(self, content_based_dir_path: str):
-        self.content_based_dir_path = content_based_dir_path
+    def __init__(self, dataset: pd.DataFrame):
+        self.dataset = dataset
         self.item_mapping = None
 
     def generate_sequential_ids(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -53,27 +53,7 @@ class DataPreparation:
         logger.info(f"Generated {len(mapping_df)} unique sequential IDs")
         return df, mapping_df
 
-    def load_dataset(self) -> pd.DataFrame:
-        """Load dataset from JSON file and select required columns."""
-        logger.info(f"Loading dataset from: {self.content_based_dir_path}")
-
-        if not Path(self.content_based_dir_path).exists():
-            logger.error(f"File not found: {self.content_based_dir_path}")
-            raise FileNotFoundError(f"File not found: {self.content_based_dir_path}")
-        
-        try:
-            with open(self.content_based_dir_path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
-
-            df = pd.DataFrame(data)
-            initial_rows = len(df)
-            df = pd.DataFrame(df[keep_columns].copy())
-            logger.info(f"Dataset loaded successfully. Initial shape: {initial_rows}, After selecting columns: {df.shape}")
-            return df
-
-        except Exception as e:
-            logger.error(f"Error loading JSON file: {e}")
-            raise
+    
     def extract_column_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Extract required features without preprocessing."""
         logger.info(f"Starting data extraction. Initial shape: {df.shape}")
@@ -167,9 +147,8 @@ class DataPreparation:
         """
         logger.info("Applying data extraction pipeline.")
         try:
-            df = self.load_dataset()
-            df = self.extract_column_data(df)
-            df = self.handle_missing_data(df)  # Ensure same dataset is used for mapping & preparation
+            df = self.extract_column_data(self.dataset)
+            df = self.handle_missing_data(df)
             df, mapping_df = self.generate_sequential_ids(df)
             self.item_mapping = mapping_df
             logger.info("Data extraction and ID generation completed successfully.")

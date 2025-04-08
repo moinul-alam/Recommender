@@ -2,9 +2,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from src.config.config import BaseConfig
 from src.models.content_based.v2.services.pipeline_service import PipelineService
-from src.models.content_based.v2.services.preparation_service import PreparationService
-from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
-from src.models.content_based.v2.services.engineering_service import EngineeringService
+from src.models.content_based.v2.services.data_preparation_service import DataPreparationService
+from src.models.content_based.v2.services.data_preprocessing_service import DataPreprocessingService
+from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
+
 from src.models.content_based.v2.services.training_service import TrainingService
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
 from src.models.content_based.v2.services.discovery_service import DiscoveryService
@@ -14,39 +15,28 @@ from src.schemas.content_based_schema import RecommendationRequest, EvaluationRe
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# content_based_router_v2 = APIRouter()
-# content_based_dir_path = ContentBasedConfigV2().DIR_PATH
-
 version = 2
 config = BaseConfig()
 content_based_dir_path = config.CONTENT_BASED_PATH / f"v{version}"
-logger.info(f"Using content-based directory: {content_based_dir_path}")
 content_based_router_v2 = APIRouter()
 
-@content_based_router_v2.post("/execute-pipeline")
-async def execute_full_pipeline(
-    content_based_dir_path: str = Query(
-        default=str(content_based_dir_path),
-        description="Path to the dataset file"
-    ),
-    raw_dataset_name: str = Query(
-        default=str("1_coredb.media.json"),
-        description="Path to the raw dataset file (json)"
-    ),
-    segment_size: int = Query(
-        default=6000,
-        description="Number of rows per segment"
-    )
-):
-    try:
-        result = PipelineService.execute_full_pipeline(
-            content_based_dir_path=content_based_dir_path,
-            raw_dataset_name=raw_dataset_name,
-            segment_size=segment_size
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+# Define constants for dataset/file/model names
+
+file_names = {
+    "dataset_name": "1_coredb.media.json",
+    "prepared_dataset_name": "2_prepared_dataset",
+    "item_map_name": "2_item_map",
+    "preprocessed_dataset_name": "3_preprocessed_dataset",
+    "preprocessed_segment_name": "3_processed_segment_",
+    "tfidf_overview": "4_tfidf_overview",
+    "tfidf_keywords": "4_tfidf_keywords",
+    "mlb_genres": "4_mlb_genres",
+    "svd_overview": "4_svd_overview",
+    "svd_keywords": "4_svd_keywords",
+    "pca": "4_pca",
+    "feature_matrix_name": "4_feature_matrix",
+    "model_config_name": "4_model_config",
+}
 
 """
 Data Preparation from raw data
@@ -55,17 +45,12 @@ Data Preparation from raw data
 async def prepare_data(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
-        description="Path to the raw dataset file (json)"
-    ),
-    raw_dataset_name: str = Query(
-        default=str("coredb.media.json"),
-        description="Path to the raw dataset file (json)"
+        description="Path to the diretory"
     )
 ):
     try:
-        return PreparationService.prepare_data(
-            content_based_dir_path=content_based_dir_path,
-            raw_dataset_name=raw_dataset_name
+        return DataPreparationService.prepare_data(
+            content_based_dir_path, file_names
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error preparing data: {str(e)}")
@@ -77,17 +62,16 @@ Data Preprocessing
 async def preprocess_data(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
-        description="Path to the dataset file"
+        description="Path to the prepared dataset file"
     ),
     segment_size: int = Query(
-        default=6000,
-        description="Number of rows per segment (default is 6000)"
+        default=10000,
+        description="Number of rows per segment (default is 10000)"
     )
 ):
     try:
-        return PreprocessingService.preprocess_data(
-            content_based_dir_path=content_based_dir_path,
-            segment_size=segment_size
+        return DataPreprocessingService.preprocess_data(
+            content_based_dir_path, segment_size, file_names
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error preprocessing data: {str(e)}")
@@ -100,11 +84,11 @@ async def engineer_features(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),  
         description="Folder to save preprocessed datasets"
-    ),
+    )
 ):
     try:
-        return EngineeringService.engineer_features(
-            content_based_dir_path=content_based_dir_path
+        return FeatureEngineeringService.engineer_features(
+            content_based_dir_path, file_names
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error preprocessing data: {str(e)}")
@@ -178,21 +162,46 @@ async def discover_media(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")
 
-@content_based_router_v2.post("/evaluate-index", response_model=EvaluationResponse)
-async def evaluate_index(
-    content_based_dir_path: str = Query(
-        default=str(content_based_dir_path),
-        description="Folder to index"
-    ),
-    num_test_queries: int = Query(default=100,
-      description="Number of test queries"),
-):
+# @content_based_router_v2.post("/evaluate-index", response_model=EvaluationResponse)
+# async def evaluate_index(
+#     content_based_dir_path: str = Query(
+#         default=str(content_based_dir_path),
+#         description="Folder to index"
+#     ),
+#     num_test_queries: int = Query(default=100,
+#       description="Number of test queries"),
+# ):
 
-    try:
-        return EvaluationService.evaluate_index(
-            content_based_dir_path=content_based_dir_path,
-            num_test_queries=num_test_queries
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error evaluating index: {str(e)}")
+#     try:
+#         return EvaluationService.evaluate_index(
+#             content_based_dir_path=content_based_dir_path,
+#             num_test_queries=num_test_queries
+#         )
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error evaluating index: {str(e)}")
 
+# @content_based_router_v2.post("/execute-pipeline")
+# async def execute_full_pipeline(
+#     content_based_dir_path: str = Query(
+#         default=str(content_based_dir_path),
+#         description="Path to the dataset file"
+#     ),
+#     dataset_name: str = Query(
+#         default=str("1_coredb.media.json"),
+#         description="Path to the raw dataset file (json)"
+#     ),
+#     segment_size: int = Query(
+#         default=6000,
+#         description="Number of rows per segment"
+#     )
+# ):
+#     try:
+#         logger.info(f"Using content-based directory: {content_based_dir_path}")
+#         result = PipelineService.execute_full_pipeline(
+#             content_based_dir_path=content_based_dir_path,
+#             dataset_name=dataset_name,
+#             segment_size=segment_size
+#         )
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")

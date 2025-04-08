@@ -8,8 +8,13 @@ logging.basicConfig(level=logging.INFO)
 
 class PipelineResponse(BaseModel):
     status: str
-    output: Optional[int] = None
-    output_path: Optional[str] = None
+    message: Optional[str] = None
+    output: Optional[str] = None
+    
+    
+    
+    
+    
 
 class EngineeringResponse(BaseModel):
     status: str

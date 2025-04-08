@@ -1,12 +1,12 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Request
-from src.config.content_based_config import ContentBasedConfigV4
+from src.config.config import BaseConfig
 # from src.models.content_based.v4.services.pipeline_service import PipelineService
 from src.models.content_based.v4.services.preparation_service import PreparationService
 from src.models.content_based.v4.services.preprocessing_service import PreprocessingService
 from src.models.content_based.v4.services.feature_engineering_service import FeatureEngineeringService
 from src.models.content_based.v4.services.model_training_service import ModelTrainingService
-# from models.content_based.v4.services.indexing_service import IndexingService
+# from src.models.content_based.v4.services.indexing_service import IndexingService
 from src.models.content_based.v4.services.recommendation_service import RecommendationService
 from src.models.content_based.v4.services.discovery_service import DiscoveryService
 from src.models.content_based.v4.services.evaluation_service import EvaluationService
@@ -15,8 +15,10 @@ from src.schemas.content_based_schema import RecommendationRequest, EvaluationRe
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+version = 4
+config = BaseConfig()
+content_based_dir_path = config.CONTENT_BASED_PATH / f"v{version}"
 content_based_router_v4 = APIRouter()
-content_based_dir_path = ContentBasedConfigV4().DIR_PATH
 
 # @content_based_router_v4.post("/execute-pipeline")
 # async def execute_full_pipeline(

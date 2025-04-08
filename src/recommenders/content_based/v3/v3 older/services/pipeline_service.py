@@ -1,8 +1,9 @@
 import os
 import logging
-from src.models.content_based.v1.services.preprocessing_service import PreprocessingService
-from src.models.content_based.v1.services.engineering_service import EngineeringService
-from src.models.content_based.v1.services.training_service import TrainingService
+from src.models.content_based.v2.services.data_preparation_service import PreparationService
+from src.models.content_based.v2.services.data_preprocessing_service import PreprocessingService
+from src.models.content_based.v2.services.engineering_service import EngineeringService
+from src.models.content_based.v2.services.training_service import TrainingService
 from src.schemas.content_based_schema import PipelineResponse
 
 logger = logging.getLogger(__name__)
@@ -10,12 +11,13 @@ logger = logging.getLogger(__name__)
 class PipelineService:
     @staticmethod
     def execute_full_pipeline(
-        dataset_path: str,
+        raw_dataset_path: str,
+        prepared_folder_path: str,
         processed_folder_path: str,
         features_folder_path: str,
+        transformers_folder_path:str,
         model_folder_path: str,
-        segment_size: int = 6000,
-        metric: str = "L2"
+        segment_size: int = 6000
     ) -> PipelineResponse :
         """
         Execute the full content-based recommendation pipeline.
@@ -33,43 +35,44 @@ class PipelineService:
         """
         try:
             # Ensure output directories exist
+            os.makedirs(prepared_folder_path, exist_ok=True)
             os.makedirs(processed_folder_path, exist_ok=True)
             os.makedirs(features_folder_path, exist_ok=True)
+            os.makedirs(transformers_folder_path, exist_ok=True)
             os.makedirs(model_folder_path, exist_ok=True)
+            
+            # Step 1: Data Preparation
+            preparing_result = PreparationService.prepare_data(
+                raw_dataset_path=raw_dataset_path,
+                prepared_folder_path=prepared_folder_path
+            )
 
-            # Step 1: Data Preprocessing
+            # Step 2: Data Preprocessing
             preprocessing_result = PreprocessingService.preprocess_data(
-                dataset_path=dataset_path,
+                prepared_folder_path=prepared_folder_path,
                 processed_folder_path=processed_folder_path,
                 segment_size=segment_size
             )
 
-            # Step 2: Feature Engineering
-            feature_engineering_result = EngineeringService.engineer_feature(
+            # Step 3: Feature Engineering
+            feature_engineering_result = EngineeringService.engineer_features(
                 processed_folder_path=processed_folder_path,
-                features_folder_path=features_folder_path
+                features_folder_path=features_folder_path,
+                transformers_folder_path=transformers_folder_path
             )
 
-            # Step 3: Model Training
+            # Step 4: Model Training
             model_training_result = TrainingService.train_model(
                 features_folder_path=features_folder_path,
-                model_folder_path=model_folder_path,
-                metric=metric
-            )
-
-            return {
-                "preprocessing": preprocessing_result,
-                "feature_engineering": feature_engineering_result,
-                "model_training": model_training_result
-            }
+                model_folder_path=model_folder_path
+            )           
             
+            return PipelineResponse(
+                            status="Model Training successful",
+                            output=1,
+                            output_path=None
+                        )
 
         except Exception as e:
             logger.error(f"Pipeline execution failed: {str(e)}")
             raise
-
-# return PipelineResponse(
-#                 status="Model Training successful",
-#                 output=1,
-#                 output_path=None
-#             )

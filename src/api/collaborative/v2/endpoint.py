@@ -1,7 +1,8 @@
 import logging
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Body, HTTPException, Query
-from src.config.collaborative_config import CollaborativeConfigV2
+
+from src.config.config import BaseConfig
 from src.models.collaborative.v2.services.pipeline_service import PipelineService
 from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
 from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
@@ -16,9 +17,11 @@ from src.models.collaborative.v2.services.model_evaluation_service import ModelE
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+version = 2
+config = BaseConfig()
+collaborative_dir_path  = config.COLLABORATIVE_PATH / f"v{version}"
 collaborative_router_v2 = APIRouter()
 
-collaborative_dir_path = CollaborativeConfigV2().DIR_PATH
 
 @collaborative_router_v2.post("/execute-pipeline")
 def execute_full_pipeline(

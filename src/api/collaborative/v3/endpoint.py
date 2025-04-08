@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from src.config.collaborative_config import CollaborativeConfigV3
+from src.config.config import BaseConfig
 from src.models.collaborative.v3.services.pipeline_service import PipelineService
 from src.models.collaborative.v3.services.preprocessing_service import PreprocessingService
 from src.models.collaborative.v3.services.model_training_service import ModelTrainingService

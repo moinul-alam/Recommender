@@ -14,34 +14,18 @@ class DataPreprocessing:
     FULL_TEXT_COLUMNS = ['overview']
     NUMERIC_COLUMNS = ['vote_average', 'release_year']
 
-    def __init__(self, dataset_path: Optional[str] = None, segment_size: int = 5000, 
+    def __init__(self, dataset: Optional[pd.DataFrame] = None, segment_size: int = 5000, 
                  keep_columns: List[str] = None, df: Optional[pd.DataFrame] = None):
         self.segment_size = segment_size
         self.keep_columns = keep_columns or [
             'item_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average',
             'release_year', 'genres', 'director', 'cast', 'keywords' 
         ]
-        self.dataset_path = dataset_path
+        self.dataset = dataset
         self.df = df
-
-        if df is None and dataset_path is None:
-            raise ValueError("Either 'dataset_path' or 'df' must be provided.")
         
         if segment_size < 1:
             raise ValueError("segment_size must be at least 1")
-
-    def load_dataset(self) -> pd.DataFrame:
-        """Load dataset from CSV file."""
-        if not Path(self.dataset_path).exists():
-            raise FileNotFoundError(f"File not found: {self.dataset_path}")
-
-        try:
-            df = pd.read_csv(self.dataset_path)
-            logger.info(f"Loaded dataset with {len(df)} rows and {len(df.columns)} columns")
-            return df.copy()
-        except Exception as e:
-            logger.error(f"Error loading CSV file: {e}")
-            raise
 
     def load_dataframe(self) -> pd.DataFrame:
         """Load data from provided DataFrame."""
@@ -187,8 +171,7 @@ class DataPreprocessing:
     def apply_data_preprocessing(self) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
         """Apply all data preprocessing steps to a new dataset."""
         try:
-            df = self.load_dataset()
-            df = self.handle_missing_or_duplicate_data(df)
+            df = self.handle_missing_or_duplicate_data(self.dataset)
             # df = self.handle_tmdb_id(df)
             df = self.handle_numeric_data(df)
             df = self.normalize_data(df)

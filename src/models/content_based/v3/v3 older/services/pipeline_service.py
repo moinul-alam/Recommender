@@ -1,7 +1,7 @@
 import os
 import logging
 from src.models.content_based.v2.services.preparation_service import PreparationService
-from src.models.content_based.v2.services.preprocessing_service import PreprocessingService
+from src.models.content_based.v2.services.data_preprocessing_service import PreprocessingService
 from src.models.content_based.v2.services.engineering_service import EngineeringService
 from src.models.content_based.v2.services.training_service import TrainingService
 from src.schemas.content_based_schema import PipelineResponse

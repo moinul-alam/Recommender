@@ -1,8 +1,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, HTTPException, Query
-from src.config.content_based_config import ContentBasedConfigV2
-from src.config.collaborative_config import CollaborativeConfigV2
+from src.config.config import BaseConfig
 from src.models.hybrid.v1.services.switching_recommendation_service import SwitchingRecommendationService
 from src.models.hybrid.v1.services.weighted_recommendation_service import WeighedRecommendationService
 
@@ -10,10 +9,11 @@ from src.models.hybrid.v1.services.weighted_recommendation_service import Weighe
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+version = 2
+config = BaseConfig()
+content_based_dir_path = config.CONTENT_BASED_PATH / f"v{version}"
+collaborative_dir_path = config.COLLABORATIVE_PATH / f"v{version}"
 hybrid_router_v1 = APIRouter()
-
-content_based_dir_path = ContentBasedConfigV2().DIR_PATH
-collaborative_dir_path = CollaborativeConfigV2().DIR_PATH
 
 @hybrid_router_v1.post("/recommendations/weighted")
 def get_user_recommendations(
