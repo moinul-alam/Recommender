@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from src.models.content_based.v2.pipeline.feature_engineering import FeatureEngineering
 from src.schemas.content_based_schema import PipelineResponse
 from src.models.common.DataLoader import load_data
-from src.models.common.DataSaver import save_data
+from src.models.common.DataSaver import save_data, save_objects
 
 
 # Configure logging
@@ -16,12 +16,8 @@ logger.setLevel(logging.INFO)
 
 class FeatureEngineeringService:
     @staticmethod
-    def engineer_features(
-        content_based_dir_path: str,
-        file_names: dict
-    ) -> PipelineResponse:
+    def engineer_features(content_based_dir_path: str, file_names: dict) -> PipelineResponse:
         try:
-            # Initialize paths
             content_based_dir_path = Path(content_based_dir_path)
             
             if not content_based_dir_path.is_dir():
@@ -53,32 +49,38 @@ class FeatureEngineeringService:
             }
             
             feature_weights = {
-                "overview": 0.45,
-                "genres": 0.40,
-                "keywords": 0.05,
-                "cast": 0.07, 
-                "director": 0.03
+                "overview": 0.40,
+                "genres": 0.35,
+                "keywords": 0.10,
+                "cast": 0.10, 
+                "director": 0.05
             }
             
             # Initialize feature engineering with components and weights
             feature_engineer = FeatureEngineering(model_components, feature_weights)
             feature_engineer.fit_transformers(preprocessed_dataset)
             
-            # Save transformers using joblib
+            # Save transformers using DataSaver
             FeatureEngineeringService._save_transformers(content_based_dir_path, feature_engineer, file_names)
             
             model_config = {
                 'weights': feature_weights,
                 'components': model_components,
-                'max_cast_members': model_components['max_cast_members'],
-                'max_directors': model_components['max_directors'],
+                # 'max_cast_members': model_components['max_cast_members'],
+                # 'max_directors': model_components['max_directors'],
                 'is_fitted': True
             }
             
-            # Save model config
-            model_config_name = file_names['model_config_name']
-            joblib.dump(model_config, content_based_dir_path / f"{file_names.get('model_config', model_config_name)}.pkl")
-            logger.info(f"Model config saved to {content_based_dir_path / 'model_config.pkl'}")
+            # Save model config using DataSaver
+            model_config_df = pd.DataFrame([model_config])
+            model_config_name = file_names.get('model_config_name', 'model_config')
+            save_data(
+                directory_path=content_based_dir_path,
+                df=model_config_df,
+                file_name=model_config_name,
+                file_type="pickle"
+            )
+            logger.info(f"Model config saved to {content_based_dir_path / f'{model_config_name}.pkl'}")
 
             # Process each segment
             segment_files = sorted(
@@ -173,30 +175,39 @@ class FeatureEngineeringService:
                 status_code=500, 
                 detail=f"Error in feature engineering: {str(e)}"
             )
-    
+
     @staticmethod
     def _save_transformers(content_based_dir_path: Path, feature_engineer: FeatureEngineering, file_names: dict) -> None:
-        """Save all transformer objects using joblib."""
+        """Save all transformer objects using DataSaver."""
         try:
-            # Save each transformer individually
-            joblib.dump(feature_engineer.tfidf_overview, content_based_dir_path / f"{file_names['tfidf_overview']}.pkl")
-            joblib.dump(feature_engineer.tfidf_keywords, content_based_dir_path / f"{file_names['tfidf_keywords']}.pkl")
-            joblib.dump(feature_engineer.mlb_genres, content_based_dir_path / f"{file_names['mlb_genres']}.pkl")
-            joblib.dump(feature_engineer.svd_overview, content_based_dir_path / f"{file_names['svd_overview']}.pkl")
-            joblib.dump(feature_engineer.svd_keywords, content_based_dir_path / f"{file_names['svd_keywords']}.pkl")
-            joblib.dump(feature_engineer.pca, content_based_dir_path / f"{file_names['pca']}.pkl")
+            # Create a dictionary mapping file names to transformer objects
+            transformers_to_save = {
+                file_names['tfidf_overview']: feature_engineer.tfidf_overview,
+                file_names['tfidf_keywords']: feature_engineer.tfidf_keywords,
+                file_names['mlb_genres']: feature_engineer.mlb_genres,
+                file_names['svd_overview']: feature_engineer.svd_overview,
+                file_names['svd_keywords']: feature_engineer.svd_keywords,
+                file_names['pca']: feature_engineer.pca
+            }
+            
+            # Save all transformers with compression
+            save_objects(
+                directory_path=content_based_dir_path,
+                objects=transformers_to_save,
+                compress=3  # Medium compression level for good balance of speed and size
+            )
             
             logger.info(f"All transformers saved to {content_based_dir_path}")
         except Exception as e:
             logger.error(f"Error saving transformers: {str(e)}", exc_info=True)
             raise
-    
+        
     @staticmethod
-    def load_transformers(content_based_dir_path: str, file_names: dict) -> FeatureEngineering:
-        """Load all transformers from disk and return initialized FeatureEngineering object."""
+    def load_transformers(content_based_dir_path: str, file_names: dict) -> 'FeatureEngineering':
         try:
             content_based_dir_path = Path(content_based_dir_path)
             
+            # Validate directory exists
             if not content_based_dir_path.is_dir():
                 raise HTTPException(
                     status_code=400, 
@@ -205,38 +216,167 @@ class FeatureEngineeringService:
             
             logger.info(f"Loading transformers from: {content_based_dir_path}")
             
-            # Load configuration
-            config_path = content_based_dir_path / f"{file_names.get('model_config', 'model_config')}.pkl"
-            if not config_path.exists():
-                raise HTTPException(status_code=400, detail=f"Model config file not found: {config_path}")
+            # Validate required files are specified
+            required_files = [
+                'model_config', 
+                'tfidf_overview', 
+                'mlb_genres', 
+                'tfidf_keywords',
+                'svd_overview', 
+                'svd_keywords', 
+                'pca'
+            ]
+            
+            missing_files = [f for f in required_files if f not in file_names]
+            if missing_files:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required file names in file_names dict: {missing_files}"
+                )
+
+            # Helper function to load transformers safely
+            def _load_transformer(transformer_name: str):
+                """Load and extract transformer from pickle file."""
+                file_path = content_based_dir_path / f"{file_names[transformer_name]}.pkl"
+                if not file_path.exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Transformer file not found: {file_path}"
+                    )
                 
-            config = joblib.load(config_path)
+                data = pd.read_pickle(file_path)
+                if isinstance(data, pd.DataFrame):
+                    if len(data) == 1 and 'transformer' in data.columns:
+                        return data.iloc[0]['transformer']
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid DataFrame format in {file_path}"
+                    )
+                return data
+
+            # Load configuration
+            config_path = content_based_dir_path / f"{file_names['model_config']}.pkl"
+            if not config_path.exists():
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Model config file not found: {config_path}"
+                )
+                
+            config = pd.read_pickle(config_path)
+            if isinstance(config, pd.DataFrame):
+                if len(config) == 1:
+                    config = config.iloc[0].to_dict()
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Config DataFrame should have exactly one row"
+                    )
+
+            # Initialize FeatureEngineering with safe defaults
+            model_components = config.get('components', {
+                'max_cast_members': 20,
+                'max_directors': 3
+            })
             
-            # Initialize an empty FeatureEngineering instance
             feature_engineer = FeatureEngineering(
-                model_components=config.get('components', {}),
-                feature_weights=config.get('weights', {})
+                model_components=model_components,
+                feature_weights=config.get('weights', {}),
+                is_fitted=config.get('is_fitted', True)
             )
+
+            # Load all transformers
+            transformers_map = {
+                'tfidf_overview': 'tfidf_overview',
+                'mlb_genres': 'mlb_genres',
+                'tfidf_keywords': 'tfidf_keywords',
+                'svd_overview': 'svd_overview',
+                'svd_keywords': 'svd_keywords',
+                'pca': 'pca'
+            }
+
+            for attr_name, file_key in transformers_map.items():
+                try:
+                    transformer = _load_transformer(file_key)
+                    setattr(feature_engineer, attr_name, transformer)
+                    logger.debug(f"Successfully loaded {attr_name} transformer")
+                except Exception as e:
+                    logger.error(f"Failed to load {attr_name}: {str(e)}")
+                    raise
+
+            # Set component-specific attributes
+            feature_engineer.max_cast_members = model_components.get('max_cast_members', 20)
+            feature_engineer.max_directors = model_components.get('max_directors', 3)
             
-            # Load transformers
-            feature_engineer.tfidf_overview = joblib.load(content_based_dir_path / f"{file_names['tfidf_overview']}.pkl")
-            feature_engineer.mlb_genres = joblib.load(content_based_dir_path / f"{file_names['mlb_genres']}.pkl")
-            feature_engineer.tfidf_keywords = joblib.load(content_based_dir_path / f"{file_names['tfidf_keywords']}.pkl")
-            feature_engineer.svd_overview = joblib.load(content_based_dir_path / f"{file_names['svd_overview']}.pkl")
-            feature_engineer.svd_keywords = joblib.load(content_based_dir_path / f"{file_names['svd_keywords']}.pkl")
-            feature_engineer.pca = joblib.load(content_based_dir_path / f"{file_names['pca']}.pkl")
-            
-            # Set instance variables from config
-            feature_engineer.max_cast_members = config.get('max_cast_members', 20)
-            feature_engineer.max_directors = config.get('max_directors', 3)
-            feature_engineer.is_fitted = config.get('is_fitted', True)
-            
-            logger.info("Transformers loaded successfully")
+            logger.info("All transformers loaded successfully")
             return feature_engineer
             
+        except HTTPException:
+            raise  # Re-raise HTTPExceptions as-is
         except Exception as e:
             logger.error(f"Error loading transformers: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, 
                 detail=f"Error loading transformers: {str(e)}"
             )
+        
+    # @staticmethod
+    # def load_transformers(content_based_dir_path: str, file_names: dict) -> FeatureEngineering:
+    #     """Load all transformers from disk and return initialized FeatureEngineering object."""
+    #     try:
+    #         content_based_dir_path = Path(content_based_dir_path)
+            
+    #         if not content_based_dir_path.is_dir():
+    #             raise HTTPException(
+    #                 status_code=400, 
+    #                 detail=f"Directory not found: {content_based_dir_path}"
+    #             )
+            
+    #         logger.info(f"Loading transformers from: {content_based_dir_path}")
+            
+    #         # Load configuration
+    #         config_path = content_based_dir_path / f"{file_names.get('model_config', 'model_config')}.pkl"
+    #         if not config_path.exists():
+    #             raise HTTPException(status_code=400, detail=f"Model config file not found: {config_path}")
+                
+    #         # Load config as DataFrame first
+    #         config_df = pd.read_pickle(config_path)
+    #         config = config_df.iloc[0].to_dict() if isinstance(config_df, pd.DataFrame) else config_df
+            
+    #         # Initialize an empty FeatureEngineering instance
+    #         feature_engineer = FeatureEngineering(
+    #             model_components=config.get('components', {}),
+    #             feature_weights=config.get('weights', {})
+    #         )
+            
+    #         # Load transformers
+    #         tfidf_overview_df = pd.read_pickle(content_based_dir_path / f"{file_names['tfidf_overview']}.pkl")
+    #         mlb_genres_df = pd.read_pickle(content_based_dir_path / f"{file_names['mlb_genres']}.pkl")
+    #         tfidf_keywords_df = pd.read_pickle(content_based_dir_path / f"{file_names['tfidf_keywords']}.pkl")
+    #         svd_overview_df = pd.read_pickle(content_based_dir_path / f"{file_names['svd_overview']}.pkl")
+    #         svd_keywords_df = pd.read_pickle(content_based_dir_path / f"{file_names['svd_keywords']}.pkl")
+    #         pca_df = pd.read_pickle(content_based_dir_path / f"{file_names['pca']}.pkl")
+            
+    #         # Extract transformers from DataFrames
+    #         feature_engineer.tfidf_overview = tfidf_overview_df.iloc[0]['transformer'] if isinstance(tfidf_overview_df, pd.DataFrame) else tfidf_overview_df
+    #         feature_engineer.mlb_genres = mlb_genres_df.iloc[0]['transformer'] if isinstance(mlb_genres_df, pd.DataFrame) else mlb_genres_df
+    #         feature_engineer.tfidf_keywords = tfidf_keywords_df.iloc[0]['transformer'] if isinstance(tfidf_keywords_df, pd.DataFrame) else tfidf_keywords_df
+    #         feature_engineer.svd_overview = svd_overview_df.iloc[0]['transformer'] if isinstance(svd_overview_df, pd.DataFrame) else svd_overview_df
+    #         feature_engineer.svd_keywords = svd_keywords_df.iloc[0]['transformer'] if isinstance(svd_keywords_df, pd.DataFrame) else svd_keywords_df
+    #         feature_engineer.pca = pca_df.iloc[0]['transformer'] if isinstance(pca_df, pd.DataFrame) else pca_df
+
+
+    #         model_components = config.get('components', {})
+    #         feature_engineer.max_cast_members = model_components.get('max_cast_members', 20)
+    #         feature_engineer.max_directors = model_components.get('max_directors', 3)
+    #         feature_engineer.is_fitted = config.get('is_fitted', True)
+
+            
+    #         logger.info("Transformers loaded successfully")
+    #         return feature_engineer
+            
+    #     except Exception as e:
+    #         logger.error(f"Error loading transformers: {str(e)}", exc_info=True)
+    #         raise HTTPException(
+    #             status_code=500, 
+    #             detail=f"Error loading transformers: {str(e)}"
+    #         )
