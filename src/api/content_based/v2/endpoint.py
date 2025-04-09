@@ -5,8 +5,8 @@ from src.models.content_based.v2.services.pipeline_service import PipelineServic
 from src.models.content_based.v2.services.data_preparation_service import DataPreparationService
 from src.models.content_based.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
+from src.models.content_based.v2.services.indexing_service import IndexingService
 
-from src.models.content_based.v2.services.training_service import TrainingService
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
 from src.models.content_based.v2.services.discovery_service import DiscoveryService
 from src.models.content_based.v2.services.evaluation_service import EvaluationService
@@ -104,8 +104,8 @@ async def train_model(
     )
 ):
     try:
-        return TrainingService.train_model(
-            content_based_dir_path=content_based_dir_path
+        return IndexingService.create_index(
+            content_based_dir_path, file_names
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error during model training: {str(e)}")

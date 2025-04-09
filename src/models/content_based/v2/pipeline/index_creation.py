@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class ModelTraining:
+class IndexCreation:
     def __init__(self, feature_matrix: pd.DataFrame, model_path: str):
         self.feature_matrix = feature_matrix
         self.model_path = model_path
@@ -25,7 +25,7 @@ class ModelTraining:
             raise ValueError("Feature matrix contains NaN values. Ensure preprocessing removes missing data.")
 
 
-    def model_training(self):
+    def create_index(self):
         """Train the FAISS model and save the index."""
         try:
             # Validate the input feature matrix
@@ -51,7 +51,7 @@ class ModelTraining:
             # Clean up memory
             gc.collect()
 
-    def apply_model_training(self):
+    def apply_create_index(self):
         """Apply FAISS model training."""
-        self.model_training()
+        self.create_index()
         return self.model_path
