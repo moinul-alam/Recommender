@@ -25,7 +25,7 @@ class IndexCreation:
             raise ValueError("Feature matrix contains NaN values. Ensure preprocessing removes missing data.")
 
 
-    def create_index(self):
+    def model_training(self):
         """Train the FAISS model and save the index."""
         try:
             # Validate the input feature matrix
@@ -51,7 +51,7 @@ class IndexCreation:
             # Clean up memory
             gc.collect()
 
-    def apply_create_index(self):
+    def apply_model_training(self):
         """Apply FAISS model training."""
-        self.create_index()
+        self.model_training()
         return self.model_path

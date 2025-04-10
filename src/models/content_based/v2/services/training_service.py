@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 from fastapi import HTTPException
-from src.models.content_based.v2.pipeline.index_creation import ModelTraining
+from src.models.content_based.v2.pipeline.index_creation import IndexCreation
 from src.schemas.content_based_schema import PipelineResponse
 
 logger = logging.getLogger(__name__)
@@ -43,9 +43,9 @@ class TrainingService:
                     detail="Feature dataset must contain only numeric columns for FAISS compatibility."
                 )
 
-            # Initialize ModelTraining class and train the model
+            # Initialize IndexCreation class and train the model
             model_path = content_based_dir_path / "4_content_based_model.index"
-            model_trainer = ModelTraining(feature_matrix, str(model_path))
+            model_trainer = IndexCreation(feature_matrix, str(model_path))
             saved_model_path = model_trainer.apply_model_training()
 
             logger.info(f"Model training successful. Model saved at: {saved_model_path}")

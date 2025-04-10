@@ -78,7 +78,7 @@ class FeatureEngineeringService:
                 directory_path=content_based_dir_path,
                 df=model_config_df,
                 file_name=model_config_name,
-                file_type="pkl"
+                file_type="pickle"
             )
             logger.info(f"Model config saved to {content_based_dir_path / f'{model_config_name}.pkl'}")
 
@@ -99,7 +99,7 @@ class FeatureEngineeringService:
                     directory_path=content_based_dir_path,
                     df=engineered_df,
                     file_name=file_names["feature_matrix_name"],
-                    file_type="pkl"
+                    file_type="pickle"
                 )
             else:
                 # Process segments
@@ -123,7 +123,7 @@ class FeatureEngineeringService:
                         directory_path=content_based_dir_path,
                         df=engineered_df,
                         file_name=segment_output_name,
-                        file_type="pkl"
+                        file_type="pickle"
                     )
                     temp_feature_matrix_files.append(Path(saved_path))
                     feature_matrix_segments.append(engineered_df)
@@ -142,7 +142,7 @@ class FeatureEngineeringService:
                     directory_path=content_based_dir_path,
                     df=feature_matrix,
                     file_name=file_names["feature_matrix_name"],
-                    file_type="pkl"
+                    file_type="pickle"
                 )
                 
                 # Clean up processed segment files after successful processing
