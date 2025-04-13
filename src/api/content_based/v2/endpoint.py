@@ -21,7 +21,6 @@ content_based_dir_path = config.CONTENT_BASED_PATH / f"v{version}"
 content_based_router_v2 = APIRouter()
 
 # Define constants for dataset/file/model names
-
 file_names = {
     "dataset_name": "1_coredb.media.json",
     "prepared_dataset_name": "2_prepared_dataset",
@@ -95,13 +94,13 @@ async def engineer_features(
         raise HTTPException(status_code=500, detail=f"Error preprocessing data: {str(e)}")
 
 """
-Model Training
+Index Creation
 """
-@content_based_router_v2.post("/model-training")
-async def train_model(
+@content_based_router_v2.post("/index-creation")
+async def create_index(
     content_based_dir_path: str = Query(
         default=str(content_based_dir_path),
-        description="Path to the folder containing feature-engineered datasets."
+        description="Path to the folder containing feature matrix."
     )
 ):
     try:
@@ -109,30 +108,22 @@ async def train_model(
             content_based_dir_path, file_names
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error during model training: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during index creation: {str(e)}")
 
 """
 Recommendation
 """
-@content_based_router_v2.post("/similar")
-async def recommendations(
-    request: Request,
+@content_based_router_v2.post("/similar-items")
+async def get_recommendations(
     recommendation_request: RecommendationRequest,
-    content_based_dir_path: str = Query(
-        default=str(content_based_dir_path), 
-        description="Directory path to the content-based model"
-        ),
-    n_items: int = Query(default=20, ge=1, le=100, description="Number of recommendations to return (1-100)"),
 ):
-    # body = await request.json()
-    # logging.info(f"Raw request body: {body}")
     logging.info(f"Sending Request to Content Based Recommendation Service V2")
     
     try:
         return RecommendationService.recommendation_service(
-            recommendation_request = recommendation_request,
-            content_based_dir_path = content_based_dir_path,
-            n_items = n_items
+            content_based_dir_path, 
+            file_names, 
+            recommendation_request
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")

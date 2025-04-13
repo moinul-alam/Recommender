@@ -11,20 +11,6 @@ class PipelineResponse(BaseModel):
     message: Optional[str] = None
     output: Optional[str] = None
     
-    
-    
-    
-    
-
-class EngineeringResponse(BaseModel):
-    status: str
-    featured_segments: int
-    saved_path: str
-
-class TrainingResponse(BaseModel):
-    status: str
-    saved_path: str
-
 class Metadata(BaseModel):
     media_type: str
     title: Optional[str]
@@ -36,31 +22,24 @@ class Metadata(BaseModel):
     director: Optional[List[str]] = Field(default_factory=list)
     cast: Optional[List[str]] = Field(default_factory=list)
     keywords: Optional[List[str]] = Field(default_factory=list)
-    
-    # @field_validator('*')
-    # @classmethod
-    # def check_fields(cls, v, info):
-    #     logger.info(f"Validating {info.field_name}: {v}")
-    #     return v
 
 class RecommendationRequest(BaseModel):
     tmdb_id: int
+    rating: Optional[float] = None
     metadata: Optional[Metadata] = None
+    num_recommendations: Optional[int] = 10
     
-    # @field_validator('*')
-    # @classmethod
-    # def check_fields(cls, v, info):
-    #     logger.info(f"Validating {info.field_name}: {v}")
-    #     return v
-     
 class Recommendation(BaseModel):
     tmdb_id: int
-    similarity: str
+    item_title: str
+    similarity: float
 
 class RecommendationResponse(BaseModel):
     status: str
-    queriedMedia: int
-    similarMedia: List[Recommendation]
+    recommendations: List[Recommendation]
+
+
+
 
 class EvaluationRequest(BaseModel):
     index_path: str

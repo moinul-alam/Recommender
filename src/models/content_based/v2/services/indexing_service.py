@@ -29,7 +29,7 @@ class IndexingService:
             if not feature_matrix_name.endswith('.pkl'):
                 feature_matrix_name += '.pkl'
             
-            feature_matrix_path = os.path.join(content_based_dir_path,feature_matrix_path)
+            feature_matrix_path = os.path.join(content_based_dir_path, feature_matrix_name)
             logger.info(f"Feature matrix path: {feature_matrix_path}")
             
             if not os.path.isfile(feature_matrix_path):
@@ -72,7 +72,7 @@ class IndexingService:
             index = IndexCreator.model_training()
             
             # Save the index to a file
-            index_name = file_names["faiss_index_name"]
+            index_name = file_names["index_name"]
             
             index_path = os.path.join(content_based_dir_path, index_name)
             

@@ -66,8 +66,6 @@ class FeatureEngineeringService:
             model_config = {
                 'weights': feature_weights,
                 'components': model_components,
-                # 'max_cast_members': model_components['max_cast_members'],
-                # 'max_directors': model_components['max_directors'],
                 'is_fitted': True
             }
             
@@ -90,7 +88,6 @@ class FeatureEngineeringService:
             
             # Check if segment files exist
             if not segment_files:
-                # If no segments found, process the entire preprocessed dataset
                 logger.info("No segment files found. Processing entire preprocessed dataset.")
                 engineered_df = feature_engineer.transform_features(preprocessed_dataset)
                 
