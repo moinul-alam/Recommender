@@ -36,6 +36,7 @@ file_names = {
     "pca": "4_pca",
     "feature_matrix_name": "4_feature_matrix",
     "model_config_name": "4_model_config",
+    "index_name": "5_similarity_index"
 }
 
 """

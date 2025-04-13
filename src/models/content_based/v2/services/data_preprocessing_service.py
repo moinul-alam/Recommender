@@ -20,7 +20,7 @@ class DataPreprocessingService:
             if not content_based_dir_path.is_dir():
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Processed folder not found: {content_based_dir_path}"
+                    detail=f"Directoryu not found: {content_based_dir_path}"
                 )
             
             prepared_dataset_name = file_names["prepared_dataset_name"]
