@@ -13,7 +13,6 @@ from src.models.content_based.v2.services.feature_engineering_service import Fea
 from src.models.content_based.v2.pipeline.feature_engineering import FeatureEngineering
 from src.models.common.DataLoader import load_data
 
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
