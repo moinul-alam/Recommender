@@ -3,7 +3,6 @@ import faiss
 import pandas as pd
 import numpy as np
 import logging
-import joblib
 from collections import Counter
 from pathlib import Path
 from fastapi import HTTPException
@@ -80,11 +79,10 @@ class RecommendationService:
             )
         
         # Defining file paths
-        # item_map_path = content_based_dir_path / file_names["item_map_name"]
-        item_map_path = content_based_dir_path / f"{file_names['item_map_name']}.csv"
-        preprocessed_dataset_path = content_based_dir_path / f"{file_names['preprocessed_dataset_name']}.csv"
-        feature_matrix_path = content_based_dir_path / f"{file_names['feature_matrix_name']}.pkl"
-        index_path = content_based_dir_path / f"{file_names['index_name']}.faiss"
+        item_map_path = content_based_dir_path / file_names["item_map_name"]
+        preprocessed_dataset_path = content_based_dir_path / file_names["preprocessed_dataset_name"]
+        feature_matrix_path = content_based_dir_path / file_names["feature_matrix_name"]
+        index_path = content_based_dir_path / file_names["index_name"]
         
         # Check if files exist
         for path, desc in [
@@ -97,11 +95,11 @@ class RecommendationService:
                 raise HTTPException(status_code=400, detail=f"{desc} file not found: {path}")
         
         # Load resources
-        item_map = load_data(item_map_path, extension='csv')
+        item_map = load_data(item_map_path)
         if item_map is None or item_map.empty:
             raise HTTPException(status_code=400, detail="Item mapping is empty or invalid")
         
-        feature_matrix = load_data(feature_matrix_path, extension='pkl')
+        feature_matrix = load_data(feature_matrix_path)
         if feature_matrix is None or feature_matrix.empty:
             raise HTTPException(status_code=400, detail="Feature matrix is empty or invalid")
         
@@ -109,7 +107,7 @@ class RecommendationService:
         if index is None:
             raise HTTPException(status_code=500, detail="Failed to load index")
             
-        preprocessed_dataset = load_data(preprocessed_dataset_path, extension='csv')
+        preprocessed_dataset = load_data(preprocessed_dataset_path)
         if preprocessed_dataset is None or preprocessed_dataset.empty:
             raise HTTPException(status_code=400, detail="Preprocessed dataset is empty or invalid")
         
