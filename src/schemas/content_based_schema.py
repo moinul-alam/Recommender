@@ -23,10 +23,13 @@ class Metadata(BaseModel):
     cast: Optional[List[str]] = Field(default_factory=list)
     keywords: Optional[List[str]] = Field(default_factory=list)
 
-class RecommendationRequest(BaseModel):
+class RecommendationItem(BaseModel):
     tmdb_id: int
     rating: Optional[float] = None
     metadata: Optional[Metadata] = None
+
+class RecommendationRequest(BaseModel):
+    items: List[RecommendationItem]
     num_recommendations: Optional[int] = 10
     
 class Recommendation(BaseModel):

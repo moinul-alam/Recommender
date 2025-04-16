@@ -6,8 +6,8 @@ from src.models.content_based.v2.services.data_preparation_service import DataPr
 from src.models.content_based.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
 from src.models.content_based.v2.services.indexing_service import IndexingService
-
 from src.models.content_based.v2.services.recommendation_service import RecommendationService
+
 from src.models.content_based.v2.services.discovery_service import DiscoveryService
 from src.models.content_based.v2.services.evaluation_service import EvaluationService
 from src.schemas.content_based_schema import RecommendationRequest, EvaluationResponse
@@ -23,19 +23,19 @@ content_based_router_v2 = APIRouter()
 # Define constants for dataset/file/model names
 file_names = {
     "dataset_name": "1_coredb.media.json",
-    "prepared_dataset_name": "2_prepared_dataset",
-    "item_map_name": "2_item_map",
-    "preprocessed_dataset_name": "3_preprocessed_dataset",
+    "prepared_dataset_name": "2_prepared_dataset.csv",
+    "item_map_name": "2_item_map.csv",
+    "preprocessed_dataset_name": "3_preprocessed_dataset.csv",
     "preprocessed_segment_name": "3_processed_segment_",
-    "tfidf_overview": "4_tfidf_overview",
-    "tfidf_keywords": "4_tfidf_keywords",
-    "mlb_genres": "4_mlb_genres",
-    "svd_overview": "4_svd_overview",
-    "svd_keywords": "4_svd_keywords",
-    "pca": "4_pca",
-    "feature_matrix_name": "4_feature_matrix",
-    "model_config_name": "4_model_config",
-    "index_name": "5_similarity_index"
+    "tfidf_overview": "4_tfidf_overview.pkl",
+    "tfidf_keywords": "4_tfidf_keywords.pkl",
+    "mlb_genres": "4_mlb_genres.pkl",
+    "svd_overview": "4_svd_overview.pkl",
+    "svd_keywords": "4_svd_keywords.pkl",
+    "pca": "4_pca.pkl",
+    "feature_matrix_name": "4_feature_matrix.pkl",
+    "model_config_name": "4_model_config.pkl",
+    "index_name": "5_similarity_index.faiss"
 }
 
 """

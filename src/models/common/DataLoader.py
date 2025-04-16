@@ -2,7 +2,6 @@ import json
 import logging
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -42,13 +41,12 @@ def load_from_feather(file_path: str) -> pd.DataFrame:
         logger.error(f"Error loading feather file {file_path}: {e}")
         raise
 
-def load_data(file_path: str, extension: Optional[str] = None, **kwargs) -> pd.DataFrame:
+def load_data(file_path: str, **kwargs) -> pd.DataFrame:
     """
-    Load data from a file based on its extension or explicitly specified format.
+    Load data from a file based on the extension in the file path.
     
     Args:
         file_path: Path to the file to load
-        extension: Optional explicit file format (json, csv, pkl, feather)
         **kwargs: Additional arguments to pass to the loading function
         
     Returns:
@@ -58,25 +56,27 @@ def load_data(file_path: str, extension: Optional[str] = None, **kwargs) -> pd.D
         FileNotFoundError: If the file doesn't exist
         ValueError: If the file format is unsupported
     """
-    if not Path(file_path).exists():
+    path = Path(file_path)
+
+    if not path.exists():
         logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"File not found: {file_path}")
     
-    # Use explicit extension if provided, otherwise infer from file path
-    if extension:
-        # Strip dot if provided
-        file_ext = extension.lower().strip('.')
-    else:
-        file_ext = Path(file_path).suffix.lower().strip('.')
+    file_ext = path.suffix.lower().strip('.')
+
+    loaders = {
+        'json': load_from_json,
+        'csv': load_from_csv,
+        'pkl': load_from_pickle,
+        'pickle': load_from_pickle,
+        'feather': load_from_feather
+    }
+
+    loader = loaders.get(file_ext)
+
+    if not loader:
+        logger.error(f"Unsupported file format: .{file_ext}")
+        raise ValueError(f"Unsupported file format: .{file_ext}")
     
-    if file_ext == 'json':
-        return load_from_json(file_path)
-    elif file_ext == 'csv':
-        return load_from_csv(file_path, **kwargs)
-    elif file_ext in ['pkl', 'pickle']:
-        return load_from_pickle(file_path)
-    elif file_ext == 'feather':
-        return load_from_feather(file_path)
-    else:
-        logger.error(f"Unsupported file format: {file_ext}")
-        raise ValueError(f"Unsupported file format: {file_ext}")
+    logger.info(f"Loading {file_ext.upper()} file: {file_path}")
+    return loader(file_path, **kwargs) if file_ext == 'csv' else loader(file_path)

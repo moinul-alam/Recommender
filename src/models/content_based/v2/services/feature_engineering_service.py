@@ -26,12 +26,12 @@ class FeatureEngineeringService:
                     detail=f"Directory not found: {content_based_dir_path}"
                 )
             
-            preprocessed_dataset_name = file_names["preprocessed_dataset_name"]
-            if not preprocessed_dataset_name.endswith('.csv'):
-                preprocessed_dataset_name += '.csv'
-            
             # Load preprocessed dataset
-            preprocessed_dataset_path = content_based_dir_path / preprocessed_dataset_name
+            preprocessed_dataset_path = content_based_dir_path / file_names["preprocessed_dataset_name"]
+            if not preprocessed_dataset_path.exists():
+                raise HTTPException(status_code=400, 
+                                    detail=f"Preprocessed dataset file not found: {preprocessed_dataset_path}")
+                
             preprocessed_dataset = load_data(preprocessed_dataset_path)
             
             if preprocessed_dataset is None or preprocessed_dataset.empty:

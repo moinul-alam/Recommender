@@ -23,20 +23,16 @@ class IndexingService:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Directory not found: {content_based_dir_path}"
-                )
-                
-            feature_matrix_name = file_names["feature_matrix_name"]
-            if not feature_matrix_name.endswith('.pkl'):
-                feature_matrix_name += '.pkl'
-            
-            feature_matrix_path = os.path.join(content_based_dir_path, feature_matrix_name)
-            logger.info(f"Feature matrix path: {feature_matrix_path}")
-            
-            if not os.path.isfile(feature_matrix_path):
+                )          
+
+            feature_matrix_path = content_based_dir_path / file_names["feature_matrix_name"]
+            if not feature_matrix_path.exists():
                 raise HTTPException(
                     status_code=400,
                     detail=f"Feature matrix file not found: {feature_matrix_path}"
                 )
+
+            logger.info(f"Feature matrix path: {feature_matrix_path}")
                 
             feature_matrix = load_data(feature_matrix_path)
             logger.info(f"Feature matrix loaded from {feature_matrix_path}")

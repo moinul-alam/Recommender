@@ -35,7 +35,7 @@ class DataPreparation:
         df = df.drop_duplicates(subset=['tmdb_id', 'media_type'])
 
         # Create mapping DataFrame
-        mapping_df = df[['tmdb_id', 'media_type', 'title']].copy()
+        mapping_df = df[['tmdb_id', 'media_type', 'title', 'spoken_languages']].copy()
         mapping_df['item_id'] = range(1, len(mapping_df) + 1)
 
         # Create a dictionary for faster mapping

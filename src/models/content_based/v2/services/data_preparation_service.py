@@ -1,6 +1,7 @@
 import logging
 import os
 from fastapi import HTTPException
+from pathlib import Path
 from src.models.content_based.v2.pipeline.data_preparation import DataPreparation
 from src.models.common.DataLoader import load_data
 from src.models.common.DataSaver import save_multiple_dataframes
@@ -15,9 +16,15 @@ class DataPreparationService:
     def prepare_data(content_based_dir_path: str, file_names: dict) -> PipelineResponse:
         try:
             # Validate dataset path
-            dataset_name = file_names["dataset_name"]
-            dataset_path = os.path.join(content_based_dir_path, dataset_name)
-            if not os.path.isfile(dataset_path):
+            content_based_dir_path = Path(content_based_dir_path)
+            if not content_based_dir_path.is_dir():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid directory path: {content_based_dir_path}"
+                )
+            
+            dataset_path = content_based_dir_path / file_names["dataset_name"]
+            if not dataset_path.is_file():
                 raise HTTPException(
                     status_code=400,
                     detail=f"Dataset file not found: {dataset_path}"

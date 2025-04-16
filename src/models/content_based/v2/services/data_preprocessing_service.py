@@ -22,12 +22,8 @@ class DataPreprocessingService:
                     status_code=400, 
                     detail=f"Directoryu not found: {content_based_dir_path}"
                 )
-            
-            prepared_dataset_name = file_names["prepared_dataset_name"]
-            if not prepared_dataset_name.endswith('.csv'):
-                prepared_dataset_name += '.csv'
-                
-            dataset_path = os.path.join(content_based_dir_path, prepared_dataset_name)
+
+            dataset_path = content_based_dir_path / file_names["prepared_dataset_name"]
             logger.info(f"Dataset path: {dataset_path}")
     
             if not os.path.isfile(dataset_path):
