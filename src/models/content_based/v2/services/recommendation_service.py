@@ -9,7 +9,6 @@ from fastapi import HTTPException
 
 from src.models.content_based.v2.pipeline.Recommender import Recommender
 from src.schemas.content_based_schema import Recommendation, RecommendationResponse, RecommendationRequest, RecommendationRequestedItem
-from src.models.content_based.v2.pipeline.data_preparation import DataPreparation
 from src.models.content_based.v2.pipeline.NewDataPreparation import NewDataPreparation
 from src.models.content_based.v2.pipeline.data_preprocessing import DataPreprocessing
 from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
@@ -247,10 +246,14 @@ class RecommendationService:
             feature_matrix = resources['feature_matrix']
             index = resources['index']
             
+            # Get expected feature dimension from FAISS index
+            expected_dim = index.d
+            logger.info(f"FAISS index expects {expected_dim} features")
+
             # Extract common media_type and spoken_languages for filtering
             media_types = [item.metadata.media_type for item in items if item.metadata and item.metadata.media_type]
             spoken_languages_lists = [item.metadata.spoken_languages for item in items 
-                                 if item.metadata and hasattr(item.metadata, 'spoken_languages') and item.metadata.spoken_languages]
+                                if item.metadata and hasattr(item.metadata, 'spoken_languages') and item.metadata.spoken_languages]
             
             # Get most common media type
             common_media_type = Counter(media_types).most_common(1)[0][0] if media_types else None
@@ -261,14 +264,14 @@ class RecommendationService:
             common_languages = [lang for lang, count in Counter(all_languages).most_common()] if all_languages else []
             logger.info(f"Common languages for pooling: {common_languages}")
             
-            # Extract features for each valid item
+            # Extract features for each valid item and collect all input tmdb_ids
             individual_features = []
-            tmdb_ids = []
+            input_tmdb_ids = set()  # Using set to avoid duplicates
             
             for item in items:
                 tmdb_id = item.tmdb_id
                 metadata = item.metadata
-                tmdb_ids.append(tmdb_id)
+                input_tmdb_ids.add(tmdb_id)  # Add to set of IDs to exclude
                 
                 # Check if item exists
                 existing_items = item_map[item_map['tmdb_id'] == tmdb_id]
@@ -276,8 +279,15 @@ class RecommendationService:
                 item_id = int(existing_items['item_id'].values[0]) if not existing_items.empty else None
                 
                 if is_item_existing:
-                    # Use existing item features
-                    item_features = feature_matrix.iloc[item_id].values
+                    # Use existing item features, excluding item_id column
+                    if 'item_id' in feature_matrix.columns:
+                        item_features = feature_matrix.loc[item_id, feature_matrix.columns != 'item_id'].values
+                    else:
+                        item_features = feature_matrix.iloc[item_id].values
+                    # Validate feature dimensions
+                    if item_features.shape[0] != expected_dim:
+                        logger.warning(f"Skipping TMDB ID {tmdb_id}: Feature vector has {item_features.shape[0]} dimensions, expected {expected_dim}")
+                        continue
                     individual_features.append(item_features)
                 else:
                     # Process new item
@@ -288,7 +298,12 @@ class RecommendationService:
                         metadata
                     )
                     if new_item_features is not None and not new_item_features.empty:
-                        individual_features.append(new_item_features.values.flatten())
+                        new_features = new_item_features.values.flatten()
+                        # Validate feature dimensions
+                        if new_features.shape[0] != expected_dim:
+                            logger.warning(f"Skipping TMDB ID {tmdb_id}: New feature vector has {new_features.shape[0]} dimensions, expected {expected_dim}")
+                            continue
+                        individual_features.append(new_features)
             
             # Skip further processing if no valid items were found
             if not individual_features:
@@ -316,6 +331,7 @@ class RecommendationService:
                 individual_recs = []
                 for features in individual_features:
                     features_reshaped = features.reshape(1, -1)
+                    logger.info(f"Processing individual features with shape {features_reshaped.shape}")
                     recs = recommender.get_recommendations_from_features(features_reshaped)
                     individual_recs.extend(recs)
                 
@@ -325,7 +341,9 @@ class RecommendationService:
                 # 2. Average pooling (25% weight)
                 if len(individual_features) > 0:
                     features_matrix = np.vstack(individual_features)
+                    logger.info(f"Features matrix shape for pooling: {features_matrix.shape}")
                     avg_features = np.mean(features_matrix, axis=0).reshape(1, -1)
+                    logger.info(f"Average features shape: {avg_features.shape}")
                     avg_recs = recommender.get_recommendations_from_features(avg_features)
                     recommendation_sets.append(avg_recs)
                     weights.append(0.25)
@@ -333,6 +351,7 @@ class RecommendationService:
                 # 3. Max pooling (25% weight)
                 if len(individual_features) > 0:
                     max_features = np.max(features_matrix, axis=0).reshape(1, -1)
+                    logger.info(f"Max features shape: {max_features.shape}")
                     max_recs = recommender.get_recommendations_from_features(max_features)
                     recommendation_sets.append(max_recs)
                     weights.append(0.25)
@@ -352,13 +371,25 @@ class RecommendationService:
                     recommendations=[]
                 )
             
-            # Filter combined recommendations
-            filtered_recommendations = recommender.filter_recommendations(
-                combined_recommendations,
-                excluded_tmdb_id=None,  # No specific item to exclude for multiple items
-                media_type=common_media_type,
-                spoken_languages=common_languages
-            )
+            # Filter combined recommendations, excluding all input tmdb_ids
+            filtered_recommendations = []
+            for rec in combined_recommendations:
+                # Get the tmdb_id for this recommendation
+                matching_item = item_map.loc[item_map['item_id'] == rec['item_id']]
+                if not matching_item.empty:
+                    rec_tmdb_id = matching_item['tmdb_id'].values[0]
+                    # Only include if not in our input set
+                    if rec_tmdb_id not in input_tmdb_ids:
+                        filtered_recommendations.append(rec)
+            
+            # Apply additional filters (media type, languages)
+            if common_media_type or common_languages:
+                filtered_recommendations = recommender.filter_recommendations(
+                    filtered_recommendations,
+                    excluded_tmdb_ids=None,  # Already filtered above
+                    media_type=common_media_type,
+                    spoken_languages=common_languages
+                )
             
             # Handle case where no recommendations are found
             if not filtered_recommendations:

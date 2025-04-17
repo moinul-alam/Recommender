@@ -28,10 +28,8 @@ class Recommender:
                 
             # Extract item's features (excluding item_id if it's in the matrix)
             if 'item_id' in self.feature_matrix.columns:
-                # If item_id is a column, exclude it before getting the feature vector
                 query_vector = self.feature_matrix.loc[self.item_id, self.feature_matrix.columns != 'item_id'].values.reshape(1, -1)
             else:
-                # If item_id is the index, just get the values directly
                 query_vector = self.feature_matrix.iloc[self.item_id].values.reshape(1, -1)
             
             # Check dimensions before search
@@ -75,6 +73,13 @@ class Recommender:
             if query_vector.ndim == 1:
                 query_vector = query_vector.reshape(1, -1)
                 
+            # Validate dimensions
+            vector_dim = query_vector.shape[1]
+            index_dim = self.index.d
+            if vector_dim != index_dim:
+                logger.error(f"Dimension mismatch: Query vector has {vector_dim} dimensions but index expects {index_dim}")
+                raise ValueError(f"Dimension mismatch: Query vector({vector_dim}) != index({index_dim})")
+                
             # Search for similar items
             distances, indices = self.index.search(query_vector, self.n_recommendations + 1)
             
@@ -97,7 +102,6 @@ class Recommender:
                     continue
                 
                 # Convert distance to similarity score (1.0 means identical, 0.0 means completely different)
-                # Assuming L2 distance with max value of 2.0
                 similarity_score = float(1.0 - distances[i] / 2.0)
                 
                 similar_items.append({
@@ -110,25 +114,42 @@ class Recommender:
                 continue
         
         logger.info(f"Found {len(similar_items)} similar media items")
-        print(f"Similar items: {similar_items}")
         return similar_items[:self.n_recommendations]
     
     def get_recommendations_from_features(self, features: np.ndarray) -> List[Dict]:
-        """Get recommendations directly from feature vector using Faiss."""
+        """Get recommendations from feature vectors using FAISS."""
         try:
-            # If features is a DataFrame with item_id, drop it
-            if isinstance(features, pd.DataFrame) and 'item_id' in features.columns:
-                features = features.drop(columns=['item_id']).values
-                
-            # Ensure proper shape
+            # If features is a DataFrame, convert to numpy array
+            if isinstance(features, pd.DataFrame):
+                if 'item_id' in features.columns:
+                    features = features.drop(columns=['item_id']).values
+                else:
+                    features = features.values
+
+            # Ensure features is a 2D array (n_items, n_features)
             if features.ndim == 1:
                 features = features.reshape(1, -1)
-                
-            # Search the index
-            distances, indices = self.index.search(features, self.n_recommendations + 1)
-            
-            return self._process_search_results(distances[0], indices[0])
-            
+
+            # Validate dimensions
+            vector_dim = features.shape[1]
+            index_dim = self.index.d
+            if vector_dim != index_dim:
+                logger.error(f"Dimension mismatch: Query vector has {vector_dim} dimensions but index expects {index_dim}")
+                raise ValueError(f"Dimension mismatch: Query vector({vector_dim}) != index({index_dim})")
+
+            # Process each feature vector individually
+            recommendation_sets = []
+            for i in range(features.shape[0]):
+                query_vector = features[i:i+1]  # Single feature vector
+                logger.info(f"Searching FAISS with query vector shape {query_vector.shape}")
+                distances, indices = self.index.search(query_vector, self.n_recommendations + 1)
+                recommendations = self._process_search_results(distances[0], indices[0])
+                recommendation_sets.append(recommendations)
+
+            # Combine recommendations with equal weights
+            weights = [1.0 / len(recommendation_sets)] * len(recommendation_sets)
+            return self.combine_recommendations(recommendation_sets, weights)
+
         except Exception as e:
             logger.error(f"Error getting recommendations from features: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
@@ -164,7 +185,7 @@ class Recommender:
     def filter_recommendations(
         self,
         recommendations: List[Dict], 
-        excluded_tmdb_id: Optional[int] = None,
+        excluded_tmdb_ids: Optional[List[int]] = None,  # Changed to accept a list
         media_type: Optional[str] = None,
         spoken_languages: Optional[List[str]] = None
     ) -> List[Dict]:
@@ -178,7 +199,7 @@ class Recommender:
         if not spoken_languages or spoken_languages == ["string"]:
             spoken_languages = ["en"]
         
-        logger.info(f"Filtering with media_type: {media_type}, languages: {spoken_languages}")
+        logger.info(f"Filtering with media_type: {media_type}, languages: {spoken_languages}, excluded_tmdb_ids: {excluded_tmdb_ids}")
         
         for rec in recommendations:
             item_id = rec['item_id']
@@ -199,8 +220,8 @@ class Recommender:
                 if isinstance(rec_languages_str, str):
                     rec_languages = [lang.strip() for lang in rec_languages_str.split(",")]
 
-            # Skip if it's the excluded item
-            if excluded_tmdb_id is not None and rec_tmdb_id == excluded_tmdb_id:
+            # Skip if it's one of the excluded items
+            if excluded_tmdb_ids is not None and rec_tmdb_id in excluded_tmdb_ids:
                 continue
 
             # Apply media type filter
