@@ -26,27 +26,52 @@ class Recommender:
             if self.item_id is None:
                 raise ValueError("Item ID is required for existing item recommendations")
                 
-            # Extract item IDs and feature vectors
-            query_vector = self.feature_matrix.iloc[self.item_id].values.reshape(1, -1)
+            # Extract item's features (excluding item_id if it's in the matrix)
+            if 'item_id' in self.feature_matrix.columns:
+                # If item_id is a column, exclude it before getting the feature vector
+                query_vector = self.feature_matrix.loc[self.item_id, self.feature_matrix.columns != 'item_id'].values.reshape(1, -1)
+            else:
+                # If item_id is the index, just get the values directly
+                query_vector = self.feature_matrix.iloc[self.item_id].values.reshape(1, -1)
+            
+            # Check dimensions before search
+            vector_dim = query_vector.shape[1]
+            index_dim = self.index.d
+            
+            if vector_dim != index_dim:
+                logger.error(f"Dimension mismatch: Query vector has {vector_dim} dimensions but index expects {index_dim}")
+                raise ValueError(f"Dimension mismatch: Query vector({vector_dim}) != index({index_dim})")
             
             # Search using FAISS index
             k = min(self.n_recommendations + 1, len(self.feature_matrix))
+            logger.info(f"Searching index with vector of shape {query_vector.shape} for k={k} results")
             distances, indices = self.index.search(query_vector, k)
             
             return self._process_search_results(distances[0], indices[0])
         
-        except IndexError:
-            logger.error(f"item_id {self.item_id} not found in the dataset", exc_info=True)
-            raise HTTPException(status_code=404, detail=f"item_id {self.item_id} not found")
+        except IndexError as e:
+            logger.error(f"item_id {self.item_id} not found in the dataset: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=404, detail=f"item_id {self.item_id} not found in dataset")
+        except AssertionError as ae:
+            logger.error(f"Dimension mismatch in FAISS: {str(ae) or 'Dimension mismatch'}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Dimension mismatch between query vector and index")
+        except ValueError as ve:
+            logger.error(f"Value error in recommendation: {str(ve)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Invalid value: {str(ve)}")
         except Exception as e:
-            logger.error(f"Error in recommendation_for_existing: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
+            error_msg = str(e) or "Unknown error occurred"
+            logger.error(f"Error in recommendation_for_existing: {error_msg}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error generating recommendations: {error_msg}")
 
     def get_recommendation_for_new(self, new_features: pd.DataFrame) -> List[Dict]:
         """Retrieve recommendations for a new item not in the dataset."""
         try:
-            # Ensure feature vector is properly shaped
-            query_vector = new_features.values
+            # Ensure we're not including item_id in the query vector
+            if 'item_id' in new_features.columns:
+                query_vector = new_features.drop(columns=['item_id']).values
+            else:
+                query_vector = new_features.values
+                
             if query_vector.ndim == 1:
                 query_vector = query_vector.reshape(1, -1)
                 
@@ -85,11 +110,16 @@ class Recommender:
                 continue
         
         logger.info(f"Found {len(similar_items)} similar media items")
+        print(f"Similar items: {similar_items}")
         return similar_items[:self.n_recommendations]
     
     def get_recommendations_from_features(self, features: np.ndarray) -> List[Dict]:
         """Get recommendations directly from feature vector using Faiss."""
         try:
+            # If features is a DataFrame with item_id, drop it
+            if isinstance(features, pd.DataFrame) and 'item_id' in features.columns:
+                features = features.drop(columns=['item_id']).values
+                
             # Ensure proper shape
             if features.ndim == 1:
                 features = features.reshape(1, -1)
@@ -141,6 +171,15 @@ class Recommender:
         """Filter recommendations based on criteria."""
         filtered_recommendations = []
         
+        # Handle placeholder values and set defaults
+        if media_type in [None, "", "string"]:
+            media_type = "movie"
+            
+        if not spoken_languages or spoken_languages == ["string"]:
+            spoken_languages = ["en"]
+        
+        logger.info(f"Filtering with media_type: {media_type}, languages: {spoken_languages}")
+        
         for rec in recommendations:
             item_id = rec['item_id']
             rec_row = self.item_map.loc[self.item_map['item_id'] == item_id]
@@ -164,11 +203,11 @@ class Recommender:
             if excluded_tmdb_id is not None and rec_tmdb_id == excluded_tmdb_id:
                 continue
 
-            # Apply media type filter if specified
+            # Apply media type filter
             if media_type and rec_media_type != media_type:
                 continue
 
-            # Apply language filter if specified
+            # Apply language filter if languages are available and specified
             if spoken_languages and rec_languages:
                 language_match = any(lang in rec_languages for lang in spoken_languages)
                 if not language_match:
@@ -176,5 +215,6 @@ class Recommender:
 
             # If it passes all filters, add it
             filtered_recommendations.append(rec)
-            
+        
+        logger.info(f"Filtered recommendations from {len(recommendations)} to {len(filtered_recommendations)}")    
         return filtered_recommendations
