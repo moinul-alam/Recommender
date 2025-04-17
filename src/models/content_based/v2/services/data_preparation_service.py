@@ -1,5 +1,4 @@
 import logging
-import os
 from fastapi import HTTPException
 from pathlib import Path
 from src.models.content_based.v2.pipeline.data_preparation import DataPreparation

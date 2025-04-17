@@ -44,16 +44,16 @@ class FeatureEngineeringService:
                 'max_directors': 3,
                 'n_components_svd_overview': 200,
                 'n_components_svd_keywords': 200,
-                'n_components_pca': 200,
+                'n_components_svd': 200,
                 'random_state': 42
             }
             
             feature_weights = {
-                "overview": 0.40,
-                "genres": 0.35,
-                "keywords": 0.10,
-                "cast": 0.10, 
-                "director": 0.05
+                "overview": 0.45,
+                "genres": 0.45,
+                "keywords": 0.05,
+                "cast": 0.03, 
+                "director": 0.02
             }
             
             # Initialize feature engineering with components and weights

@@ -39,6 +39,30 @@ file_names = {
 }
 
 """
+Content Based Recommendation Pipeline
+"""
+
+@content_based_router_v2.post("/pipeline")
+async def execute_pipeline(
+    content_based_dir_path: str = Query(
+        default=str(content_based_dir_path),  
+        description="Path to the dataset file"
+    ),
+    segment_size: int = Query(
+        default=10000,
+        description="Number of rows per segment"
+    )
+):
+    try:
+        logger.info(f"Using content-based directory: {content_based_dir_path}")
+        result = PipelineService.execute_full_pipeline(
+            content_based_dir_path, file_names, segment_size
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+
+"""
 Data Preparation from raw data
 """
 @content_based_router_v2.post("/data-preparation")

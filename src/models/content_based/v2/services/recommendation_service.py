@@ -193,13 +193,19 @@ class RecommendationService:
                     recommendations=[]
                 )
                 
-            # Filter recommendations based on criteria
-            filtered_recommendations = recommender.filter_recommendations(
-                recommended_items, 
-                excluded_tmdb_id=tmdb_id,
-                media_type=media_type, 
-                spoken_languages=spoken_languages
-            )
+            # First filter: Exclude the input item
+            filtered_recommendations = [
+                rec for rec in recommended_items 
+                if item_map.loc[item_map['item_id'] == rec['item_id'], 'tmdb_id'].values[0] != tmdb_id
+            ]
+            
+            # Second filter: Apply media type and language filters if needed
+            if media_type or spoken_languages:
+                filtered_recommendations = recommender.filter_recommendations(
+                    filtered_recommendations,
+                    media_type=media_type, 
+                    spoken_languages=spoken_languages
+                )
             
             # Handle case where no recommendations are found
             if not filtered_recommendations:
