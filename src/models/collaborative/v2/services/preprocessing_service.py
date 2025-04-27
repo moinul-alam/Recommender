@@ -1,7 +1,7 @@
 import logging
 import os
 import json
-import pathlib
+from pathlib import Path
 import pickle
 from typing import Dict, Optional
 import pandas as pd
@@ -26,11 +26,13 @@ class PreprocessingService:
         
         try:
             # Validate input and output paths
-            collaborative_dir_path = pathlib.Path(collaborative_dir_path)
+            collaborative_dir_path = Path(collaborative_dir_path)
             
-            if not collaborative_dir_path.exists():
-                logger.error(f"Collaborative directory not found: {collaborative_dir_path}")
-                return None
+            if not collaborative_dir_path.is_dir():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid directory path: {collaborative_dir_path}"
+                )
             
             # Locate input file
             input_file = collaborative_dir_path / dataset_name
