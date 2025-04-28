@@ -1,3 +1,4 @@
+# IndexingService with optimized FAISS for maximum accuracy
 import os
 from pathlib import Path
 import faiss
