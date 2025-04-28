@@ -12,7 +12,7 @@ from src.schemas.content_based_schema import Recommendation, RecommendationRespo
 from src.models.content_based.v2.pipeline.data_preparation import DataPreparation
 from src.models.content_based.v2.pipeline.NewDataPreparation import NewDataPreparation
 from src.models.content_based.v2.pipeline.data_preprocessing import DataPreprocessing
-from src.models.content_based.v2.services.feature_engineering_service import FeatureEngineeringService
+from models.content_based.v2.services.feature_engineering_service2 import FeatureEngineeringService
 from src.models.content_based.v2.pipeline.feature_engineering import FeatureEngineering
 from src.models.common.DataLoader import load_data
 

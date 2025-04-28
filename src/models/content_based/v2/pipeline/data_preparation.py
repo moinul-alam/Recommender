@@ -4,20 +4,93 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Set up logging globally
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Columns to retain from the dataset
-keep_columns = [
-    'tmdb_id', 'media_type', 'spoken_languages', 'title', 'overview', 'vote_average', 
-    'release_date', 'genres', 'credits', 'keywords'
-]
 
 class DataPreparation:
     def __init__(self, dataset: pd.DataFrame):
         self.dataset = dataset
         self.item_mapping = None
+        
+    def extract_column_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Extract required features without preprocessing."""
+        logger.info(f"Starting data extraction. Initial shape: {df.shape}")
+
+        df = df.copy()
+
+        df.loc[:, 'spoken_languages'] = df['spoken_languages'].apply(
+            lambda x: ', '.join([lang.get('iso_639_1', '').strip() for lang in x]) 
+            if isinstance(x, list) and x else ''
+        )
+
+        df.loc[:, 'genres'] = df['genres'].apply(
+            lambda x: ', '.join([genre.get('name', '').strip() for genre in x]) 
+            if isinstance(x, list) and x else ''
+        )
+
+        df.loc[:, 'keywords'] = df['keywords'].apply(
+            lambda x: ', '.join([keyword.get('name', '') for keyword in x]) 
+            if isinstance(x, list) and x else ''
+        )
+
+        def extract_crew_info(credits, role_types):
+            if isinstance(credits, list) and credits:
+                names = [person['name'] for person in credits 
+                        if isinstance(person, dict) and 
+                        person.get('type') in role_types and 
+                        person.get('name')]
+                return ', '.join(names) if names else ''
+            return ''
+
+        df.loc[:, 'director'] = df['credits'].apply(lambda x: extract_crew_info(x, ['director', 'creator']))
+        df.loc[:, 'cast'] = df['credits'].apply(lambda x: extract_crew_info(x, ['cast']))
+        df = df.drop(columns=['credits'])
+
+        def extract_release_year(date_obj):
+            try:
+                if isinstance(date_obj, str):
+                    return datetime.strptime(date_obj.split('T')[0], '%Y-%m-%d').year
+                if isinstance(date_obj, dict) and '$date' in date_obj:
+                    date_value = date_obj['$date']
+                    if isinstance(date_value, str):
+                        return datetime.strptime(date_value.split('T')[0], '%Y-%m-%d').year
+                    elif isinstance(date_value, dict) and '$numberLong' in date_value:
+                        timestamp_ms = int(date_value['$numberLong'])
+                        return (datetime(1970, 1, 1) + timedelta(milliseconds=timestamp_ms)).year
+            except Exception as e:
+                logger.warning(f"Error processing release date: {date_obj}. Error: {e}")
+            return None
+
+        df.loc[:, 'release_year'] = df['release_date'].apply(extract_release_year)
+        df = df.drop(columns=['release_date'])
+
+        logger.info(f"Data extraction completed. Final shape: {df.shape}")
+        return df
+    
+    def handle_missing_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Remove rows with missing `overview`, or `genres`."""
+        logger.info("Handling missing data")
+        initial_rows = len(df)
+        
+        # Drop rows with NaN values
+        df = df.dropna(subset=['tmdb_id', 'overview', 'genres', 'director', 'cast', 'keywords', 'tagline', 'release_year'])
+        
+        # Drop rows with empty strings
+        df = df[df['tmdb_id'].notna()]
+        df = df[df['overview'].str.strip() != '']
+        df = df[df['genres'].str.strip() != '']
+        df = df[df['director'].str.strip() != '']
+        df = df[df['cast'].str.strip() != '']
+        df = df[df['keywords'].str.strip() != '']
+        df = df[df['tagline'].str.strip() != '']
+        df = df[df['release_year'].notnull()]
+        df = df[df['release_year'] != '']
+        
+        removed_rows = initial_rows - len(df)
+        if removed_rows > 0:
+            logger.info(f"Removed {removed_rows} rows with missing tmdb_id, overview, or genres")
+
+        return df
 
     def generate_sequential_ids(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -52,90 +125,14 @@ class DataPreparation:
 
         logger.info(f"Generated {len(mapping_df)} unique sequential IDs")
         return df, mapping_df
-
     
-    def extract_column_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Extract required features without preprocessing."""
-        logger.info(f"Starting data extraction. Initial shape: {df.shape}")
-
+    def format_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        logger.info("Formatting data")
         df = df.copy()
-
-        # Extract 'spoken_languages' as a comma-separated string of language codes
-        df.loc[:, 'spoken_languages'] = df['spoken_languages'].apply(
-            lambda x: ', '.join([lang.get('iso_639_1', '').strip() for lang in x]) 
-            if isinstance(x, list) and x else ''
-        )
-
-        # Extract 'genres' as a comma-separated string
-        df.loc[:, 'genres'] = df['genres'].apply(
-            lambda x: ', '.join([genre.get('name', '').strip() for genre in x]) 
-            if isinstance(x, list) and x else ''
-        )
-
-        # Extract 'keywords' as a comma-separated string
-        df.loc[:, 'keywords'] = df['keywords'].apply(
-            lambda x: ', '.join([keyword.get('name', '') for keyword in x]) 
-            if isinstance(x, list) and x else ''
-        )
-
-        # Extract 'credits' - Extract directors and cast
-        def extract_crew_info(credits, role_types):
-            if isinstance(credits, list) and credits:
-                names = [person['name'] for person in credits 
-                        if isinstance(person, dict) and 
-                        person.get('type') in role_types and 
-                        person.get('name')]
-                return ', '.join(names) if names else ''
-            return ''
-
-        # Extract directors and cast
-        df.loc[:, 'director'] = df['credits'].apply(lambda x: extract_crew_info(x, ['director', 'creator']))
-        df.loc[:, 'cast'] = df['credits'].apply(lambda x: extract_crew_info(x, ['cast']))
-        df = df.drop(columns=['credits'])
-
-        # Extract 'release_year' from 'release_date'
-        def extract_release_year(date_obj):
-            try:
-                if isinstance(date_obj, str):
-                    return datetime.strptime(date_obj.split('T')[0], '%Y-%m-%d').year
-                if isinstance(date_obj, dict) and '$date' in date_obj:
-                    date_value = date_obj['$date']
-                    if isinstance(date_value, str):
-                        return datetime.strptime(date_value.split('T')[0], '%Y-%m-%d').year
-                    elif isinstance(date_value, dict) and '$numberLong' in date_value:
-                        timestamp_ms = int(date_value['$numberLong'])
-                        return (datetime(1970, 1, 1) + timedelta(milliseconds=timestamp_ms)).year
-            except Exception as e:
-                logger.warning(f"Error processing release date: {date_obj}. Error: {e}")
-            return None
-
-        df.loc[:, 'release_year'] = df['release_date'].apply(extract_release_year)
-        df = df.drop(columns=['release_date'])
-
-        df = df[['tmdb_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average', 'release_year', 'genres', 'director', 'cast', 'keywords']]
-
-        logger.info(f"Data extraction completed. Final shape: {df.shape}")
-        return df
-
-    def handle_missing_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove rows with missing `overview`, or `genres`."""
-        logger.info("Handling missing data")
-        initial_rows = len(df)
         
-        # Drop rows with NaN values
-        df = df.dropna(subset=['tmdb_id', 'overview', 'genres'])
-        
-        # Drop rows with empty strings
-        df = df[
-            (df['overview'].str.strip() != '') & 
-            (df['genres'].str.strip() != '') &
-            (df['tmdb_id'].notna())
-        ]
+        df = df[['tmdb_id', 'media_type', 'title', 'overview', 'genres', 'vote_average', 'vote_count', 'spoken_languages', 'tagline', 'release_year', 'director', 'cast', 'keywords', 'item_id']]
 
-        removed_rows = initial_rows - len(df)
-        if removed_rows > 0:
-            logger.info(f"Removed {removed_rows} rows with missing tmdb_id, overview, or genres")
-
+        logger.info("Data formatting completed")
         return df
 
     def apply_data_preparation(self) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -151,6 +148,7 @@ class DataPreparation:
             df = self.handle_missing_data(df)
             df, mapping_df = self.generate_sequential_ids(df)
             self.item_mapping = mapping_df
+            df = self.format_dataframe(df)
             logger.info("Data extraction and ID generation completed successfully.")
             return df, mapping_df
         except Exception as e:

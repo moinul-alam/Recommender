@@ -10,16 +10,17 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 class DataPreprocessing:
-    LIST_COLUMNS = ['media_type', 'title', 'spoken_languages', 'genres', 'keywords', 'director', 'cast']
-    FULL_TEXT_COLUMNS = ['overview']
-    NUMERIC_COLUMNS = ['vote_average', 'release_year']
+    LIST_COLUMNS = ['spoken_languages', 'genres', 'keywords', 'director', 'cast']
+    FULL_TEXT_COLUMNS = ['overview', 'tagline']
+    NUMERIC_COLUMNS = ['vote_average', 'vote_count', 'release_year']
 
     def __init__(self, dataset: Optional[pd.DataFrame] = None, segment_size: int = 5000, 
                  keep_columns: List[str] = None, df: Optional[pd.DataFrame] = None):
         self.segment_size = segment_size
         self.keep_columns = keep_columns or [
-            'item_id', 'media_type', 'title', 'overview', 'spoken_languages', 'vote_average',
-            'release_year', 'genres', 'director', 'cast', 'keywords' 
+            'item_id', 'media_type', 'title', 
+            'overview', 'tagline', 'keywords', 'genres', 'director', 'cast',
+            'spoken_languages', 'vote_average','vote_count', 'release_year'  
         ]
         self.dataset = dataset
         self.df = df
@@ -98,9 +99,9 @@ class DataPreprocessing:
         def preprocess_text(text: str) -> str:
             """Normalize general text fields by cleaning punctuation and extra spaces."""
             if pd.isna(text) or text == '':
-                return 'unknown'  # Explicitly assigning 'unknown' for missing values
-            text = re.sub(r'[^\w\s]', '', str(text))  # Remove punctuation except for alphanumeric and spaces
-            return ' '.join(text.lower().split())  # Lowercase and remove extra spaces
+                return 'unknown'  
+            text = re.sub(r'[^\w\s]', '', str(text))
+            return ' '.join(text.lower().split())
 
         def process_list_field(field: str) -> str:
             """Ensure lowercase transformation while keeping commas intact."""
@@ -110,7 +111,7 @@ class DataPreprocessing:
             # Lowercase and clean up the string (remove extra spaces around commas)
             field = str(field).strip().lower()
             field = re.sub(r'\s*,\s*', ',', field)
-            return field  # Comma-separated, lowercase genres/cast/director
+            return field
 
         # Apply transformations for the list columns (genres, cast, director, keywords)
         text_transformations: Dict[str, pd.Series] = {}
@@ -133,11 +134,14 @@ class DataPreprocessing:
         # Apply the preprocessing for keywords
         df['keywords'] = df['keywords'].apply(preprocess_keywords)
 
-        # Process 'overview' (lowercase, punctuation removed)
+        # Process text fields (overview, tagline)
         if 'overview' in df.columns:
             text_transformations['overview'] = df['overview'].apply(preprocess_text)
+        
+        if 'tagline' in df.columns:
+            text_transformations['tagline'] = df['tagline'].apply(preprocess_text)
 
-        # Apply the transformations to genres, cast, director, overview
+        # Apply the transformations to genres, cast, director, overview, and tagline
         df = df.assign(**text_transformations)
 
         # Log any replacements of missing values with 'unknown'
@@ -147,7 +151,6 @@ class DataPreprocessing:
                 logger.info(f"Replaced {empty_count} missing values in {col} with 'unknown'")
 
         return df
-
     
     def select_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Select and validate required columns."""
@@ -172,7 +175,6 @@ class DataPreprocessing:
         """Apply all data preprocessing steps to a new dataset."""
         try:
             df = self.handle_missing_or_duplicate_data(self.dataset)
-            # df = self.handle_tmdb_id(df)
             df = self.handle_numeric_data(df)
             df = self.normalize_data(df)
             df = self.select_columns(df)

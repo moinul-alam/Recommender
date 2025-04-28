@@ -5,12 +5,27 @@ import pandas as pd
 from pathlib import Path
 from typing import Union, Dict, Any, Optional
 
-# Configure logging
+# Configure logging with function name for better traceability
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(funcName)s - %(levelname)s - %(message)s'
+)
 
 def save_to_csv(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
-    """Save DataFrame to a CSV file."""
+    """Save DataFrame to a CSV file.
+
+    Args:
+        df: DataFrame to save.
+        file_path: Path to the CSV file.
+        **kwargs: Additional arguments for pandas.to_csv (e.g., index, encoding).
+
+    Returns:
+        str: Full path to the saved file.
+
+    Raises:
+        Exception: If saving fails.
+    """
     try:
         str_path = str(file_path)
         logger.info(f"Saving CSV to {str_path}")
@@ -22,7 +37,19 @@ def save_to_csv(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
         raise
 
 def save_to_json(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
-    """Save DataFrame to a JSON file."""
+    """Save DataFrame to a JSON file.
+
+    Args:
+        df: DataFrame to save.
+        file_path: Path to the JSON file.
+        **kwargs: Additional arguments for pandas.to_json (e.g., orient, lines).
+
+    Returns:
+        str: Full path to the saved file.
+
+    Raises:
+        Exception: If saving fails.
+    """
     try:
         str_path = str(file_path)
         logger.info(f"Saving JSON to {str_path}")
@@ -34,7 +61,18 @@ def save_to_json(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str
         raise
 
 def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
-    """Save DataFrame to a pickle file."""
+    """Save DataFrame to a pickle file.
+
+    Args:
+        df: DataFrame to save.
+        file_path: Path to the pickle file.
+
+    Returns:
+        str: Full path to the saved file.
+
+    Raises:
+        Exception: If saving fails.
+    """
     try:
         str_path = str(file_path)
         logger.info(f"Saving Pickle to {str_path}")
@@ -46,13 +84,28 @@ def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
         raise
 
 def save_to_feather(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
-    """Save DataFrame to a feather file."""
+    """Save DataFrame to a feather file.
+
+    Args:
+        df: DataFrame to save.
+        file_path: Path to the feather file.
+
+    Returns:
+        str: Full path to the saved file.
+
+    Raises:
+        Exception: If saving fails or required libraries (pyarrow/fastparquet) are not installed.
+    """
     try:
+        import pyarrow  # Check if pyarrow is installed
         str_path = str(file_path)
         logger.info(f"Saving Feather to {str_path}")
         df.to_feather(file_path)
         logger.info(f"Data saved to feather: {str_path}")
         return str_path
+    except ImportError:
+        logger.error("Feather format requires 'pyarrow' or 'fastparquet' to be installed.")
+        raise
     except Exception as e:
         logger.error(f"Error saving feather file {file_path}: {e}")
         raise
@@ -68,15 +121,24 @@ def save_data(
     Save DataFrame to a file with specified directory, name, and type.
     
     Args:
-        directory_path: Path to the directory where file will be saved
-        df: DataFrame to save
-        file_name: Name of the file (without extension)
-        file_type: Type of file to save ('csv', 'json', 'pickle', 'feather')
-        **kwargs: Additional arguments to pass to the respective save function
+        directory_path: Path to the directory where file will be saved.
+        df: DataFrame to save.
+        file_name: Name of the file (without extension).
+        file_type: Type of file to save ('csv', 'json', 'pkl', 'feather').
+        **kwargs: Additional arguments for the respective save function (e.g., index for to_csv).
         
     Returns:
-        str: Full path to the saved file
+        str: Full path to the saved file.
+
+    Raises:
+        ValueError: If the DataFrame is empty or file_type is unsupported.
+        Exception: If saving fails.
     """
+    # Validate inputs
+    if df.empty:
+        logger.error("Cannot save an empty DataFrame.")
+        raise ValueError("DataFrame is empty.")
+    
     # Normalize directory path to Path object
     directory = Path(directory_path)
     
@@ -94,15 +156,17 @@ def save_data(
     save_functions = {
         'csv': save_to_csv,
         'json': save_to_json,
-        'pkl': save_to_pickle,
-        'pickle': save_to_pickle,
+        'pkl': save_to_pickle,  # Reverted to 'pkl' as per user preference
         'feather': save_to_feather
     }
     
     if file_type in save_functions:
         return save_functions[file_type](df, file_path, **kwargs)
     else:
-        logger.warning(f"Unsupported file format: {file_type}, defaulting to 'csv'.")
+        logger.warning(
+            f"Unsupported file format: {file_type}. Supported formats: {list(save_functions.keys())}. "
+            "Defaulting to 'csv'."
+        )
         return save_to_csv(df, file_path, **kwargs)
 
 def save_multiple_dataframes(
@@ -115,13 +179,17 @@ def save_multiple_dataframes(
     Save multiple DataFrames to files in the specified directory.
     
     Args:
-        directory_path: Path to the directory where files will be saved
-        dataframes: Dictionary mapping file names to DataFrames
-        file_type: Type of file to save ('csv', 'json', 'pickle', 'feather')
-        **kwargs: Additional arguments to pass to the respective save function
+        directory_path: Path to the directory where files will be saved.
+        dataframes: Dictionary mapping file names to DataFrames.
+        file_type: Type of file to save ('csv', 'json', 'pkl', 'feather').
+        **kwargs: Additional arguments for the respective save function.
         
     Returns:
-        Dict[str, str]: Dictionary mapping file names to saved file paths
+        Dict[str, str]: Dictionary mapping file names to saved file paths.
+
+    Raises:
+        ValueError: If any DataFrame is empty.
+        Exception: If saving fails.
     """
     saved_paths = {}
     for file_name, df in dataframes.items():
@@ -140,14 +208,23 @@ def save_object(
     Save any Python object (like ML models) to a pickle file.
     
     Args:
-        directory_path: Path to the directory where file will be saved
-        obj: Object to save
-        file_name: Name of the file (without extension)
-        compress: Compression level (0-9, None for no compression)
+        directory_path: Path to the directory where file will be saved.
+        obj: Object to save.
+        file_name: Name of the file (without extension).
+        compress: Compression level (0-9, None for no compression).
         
     Returns:
-        str: Full path to the saved file
+        str: Full path to the saved file.
+
+    Raises:
+        ValueError: If compress is not None or an integer between 0 and 9.
+        Exception: If saving fails.
     """
+    # Validate compression level
+    if compress is not None and not (isinstance(compress, int) and 0 <= compress <= 9):
+        logger.error("Compression level must be None or an integer between 0 and 9.")
+        raise ValueError("Compression level must be None or an integer between 0 and 9.")
+    
     # Normalize directory path to Path object
     directory = Path(directory_path)
     
@@ -179,12 +256,16 @@ def save_objects(
     Save multiple objects to pickle files in the specified directory.
     
     Args:
-        directory_path: Path to the directory where files will be saved
-        objects: Dictionary mapping file names to objects
-        compress: Compression level (0-9, None for no compression)
+        directory_path: Path to the directory where files will be saved.
+        objects: Dictionary mapping file names to objects.
+        compress: Compression level (0-9, None for no compression).
         
     Returns:
-        Dict[str, str]: Dictionary mapping file names to saved file paths
+        Dict[str, str]: Dictionary mapping file names to saved file paths.
+
+    Raises:
+        ValueError: If compress is invalid.
+        Exception: If saving fails.
     """
     saved_paths = {}
     for file_name, obj in objects.items():

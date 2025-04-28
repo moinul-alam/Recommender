@@ -25,35 +25,50 @@ config = BaseConfig()
 collaborative_dir_path  = config.COLLABORATIVE_PATH / f"v{version}"
 collaborative_router_v2 = APIRouter()
 
+# Define constants for dataset/file/model names
+file_names = {
+    "dataset_name": "1_movielens_dataset.csv",
+    # "prepared_dataset_name": "2_prepared_dataset.csv",
+    # "item_map_name": "2_item_map.csv",
+    # "preprocessed_dataset_name": "3_preprocessed_dataset.csv",
+    # "preprocessed_segment_name": "3_processed_segment_",
+    # "tfidf_overview": "4_tfidf_overview.pkl",
+    # "tfidf_keywords": "4_tfidf_keywords.pkl",
+    # "mlb_genres": "4_mlb_genres.pkl",
+    # "svd_overview": "4_svd_overview.pkl",
+    # "svd_keywords": "4_svd_keywords.pkl",
+    # "pca": "4_pca.pkl",
+    # "feature_matrix_name": "4_feature_matrix.pkl",
+    # "model_config_name": "4_model_config.pkl",
+    # "index_name": "5_similarity_index.faiss"
+}
 
-
+"""
+Data Preprocessing
+"""
 @collaborative_router_v2.post("/data-preprocessing")
-def process_data(
+async def process_data(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
     ),
-    dataset_name: str = Query(
-        default=str("1_movielens_dataset.csv"),
-        description="Name of the dataset file"
-    ),
     sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
-    sparse_item_threshold: int = Query(1, description="Minimum ratings per item"),
-    split_percent: float = Query(0.8, description="Train-test split ratio"),
-    chunk_size: int = Query(10000, description="Chunk size for processing")
+    sparse_item_threshold: int = Query(5, description="Minimum ratings per item"),
+    train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
+    segment_size: int = Query(10000, description="Segment size for processing")
 ):
     logger.info(
-        f"Received data preprocessing request in the route Collaborative v2 "
+        f"Received data preprocessing request in the route Collaborative v{version} "
     )
 
     try:
         result = PreprocessingService.process_data(
-            collaborative_dir_path=collaborative_dir_path,
-            dataset_name=dataset_name,
-            sparse_user_threshold=sparse_user_threshold,
-            sparse_item_threshold=sparse_item_threshold,
-            split_percent=split_percent,
-            chunk_size=chunk_size
+            collaborative_dir_path,
+            file_names,
+            sparse_user_threshold,
+            sparse_item_threshold,
+            train_test_split_ratio,
+            segment_size
         )
         
         if result is None:
@@ -67,6 +82,10 @@ def process_data(
         logger.error(f"Error during data preprocessing: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+"""
+Feature Engineering and Dimensionality Reduction
+"""
 @collaborative_router_v2.post("/model-training")
 def train_model(
     collaborative_dir_path: str = Query(
@@ -239,8 +258,8 @@ def evaluate_model(
 #     ),
 #     sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
 #     sparse_item_threshold: int = Query(1, description="Minimum ratings per item"),
-#     split_percent: float = Query(0.8, description="Train-test split ratio"),
-#     chunk_size: int = Query(10000, description="Chunk size for processing"),
+#     train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
+#     segment_size: int = Query(10000, description="Chunk size for processing"),
 #     n_neighbors: Optional[int] = Query(
 #         default=100, 
 #         description="Number of nearest neighbors to consider"
@@ -264,8 +283,8 @@ def evaluate_model(
 #             dataset_name=dataset_name,
 #             sparse_user_threshold=sparse_user_threshold,
 #             sparse_item_threshold=sparse_item_threshold,
-#             split_percent=split_percent,
-#             chunk_size=chunk_size,
+#             train_test_split_ratio=train_test_split_ratio,
+#             segment_size=segment_size,
 #             n_neighbors=n_neighbors,
 #             similarity_metric=similarity_metric,
 #             batch_size=batch_size,

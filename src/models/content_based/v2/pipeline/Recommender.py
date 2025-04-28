@@ -109,6 +109,8 @@ class Recommender:
                     'similarity': similarity_score
                 })
                 
+                logger.info(f"Item ID: {idx}, Similarity: {similarity_score}")
+                
             except (IndexError, ValueError) as e:
                 logger.warning(f"Invalid index encountered: {idx} - {str(e)}")
                 continue
