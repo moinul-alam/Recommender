@@ -71,7 +71,7 @@ class DataPreprocessing:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
             if col == 'release_year':
-                mode_value = df[col].mode()[0] if not df[col].mode().empty else 2000  # Default to 2000 if mode is empty
+                mode_value = df[col].mode()[0] if not df[col].mode().empty else 2000
                 df[col] = df[col].fillna(mode_value)
 
                 mask = (df[col] < 1900) | (df[col] > 2025)
@@ -125,11 +125,11 @@ class DataPreprocessing:
         def preprocess_keywords(keywords: str) -> str:
             """Preprocess keywords by splitting on commas, lowercasing, and tokenizing."""
             if pd.isna(keywords) or keywords == '':
-                return 'unknown'  # Replace missing or empty values with 'unknown'
-            keywords = keywords.lower()  # Convert to lowercase
-            keywords = re.sub(r'\s*,\s*', ',', keywords)  # Remove extra spaces around commas
-            keywords = keywords.split(',')  # Tokenize by splitting on commas
-            return ' '.join(keywords)  # Return tokenized, space-separated keywords string
+                return 'unknown'
+            keywords = keywords.lower()
+            keywords = re.sub(r'\s*,\s*', ',', keywords)
+            keywords = keywords.split(',')
+            return ' '.join(keywords)
 
         # Apply the preprocessing for keywords
         df['keywords'] = df['keywords'].apply(preprocess_keywords)
