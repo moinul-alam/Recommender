@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 import pickle
 from typing import Dict, Optional
+from fastapi import HTTPException
 import pandas as pd
-from src.models.collaborative.v2.pipeline.DataPreprocessing import DataPreprocessing
+from models.common.DataLoader import load_data
+from models.common.DataSaver import save_data
+from models.collaborative.v2.pipeline.data_preprocessing import DataPreprocessing
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -14,11 +17,11 @@ class PreprocessingService:
     @staticmethod
     def process_data(
         collaborative_dir_path: str,
-        dataset_name: str,
+        file_names: dict,
         sparse_user_threshold: int = 5,
         sparse_item_threshold: int = 5,
         split_percent: float = 0.8,
-        chunk_size: int = 10000,
+        segment_size: int = 10000,
     ) -> Optional[Dict[str, str]]:
         
         logger = logging.getLogger(__name__)
@@ -34,29 +37,34 @@ class PreprocessingService:
                     detail=f"Invalid directory path: {collaborative_dir_path}"
                 )
             
-            # Locate input file
-            input_file = collaborative_dir_path / dataset_name
+            # Locate datset file
+            dataset_path = collaborative_dir_path / file_names["dataset_name"]
             
-            if not input_file.exists():
-                logger.error(f"Dataset file not found: {input_file}")
-                return None
-            
+            if not dataset_path.is_file():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Dataset file not found: {dataset_path}"
+                )
+                       
             # Load dataset
-            logger.info(f"Loading dataset from {input_file}")
-            df = pd.read_csv(input_file)
+            dataset = load_data(dataset_path)
+            logger.info(f"Dataset loaded from {dataset_path}")
             
-            # Initialize processor
-            processor = DataPreprocessing(
-                sparse_user_threshold=sparse_user_threshold,
-                sparse_item_threshold=sparse_item_threshold,
-                split_percent=split_percent,
-                chunk_size = chunk_size
+            if dataset is None or dataset.empty:
+                raise HTTPException(status_code=400, detail="Dataset is empty or invalid")
+                     
+            # Initialize preprocessor
+            preprocessor = DataPreprocessing(
+                sparse_user_threshold,
+                sparse_item_threshold,
+                split_percent,
+                segment_size
             )
             
             # Process data
             train, test, user_mapping, user_reverse_mapping, \
             item_mapping, item_reverse_mapping, \
-            user_item_matrix = processor.process(df)
+            user_item_matrix = preprocessor.process(df = dataset)
             
             print(list(item_mapping.items())[:5])
             print(list(item_reverse_mapping.items())[:5])

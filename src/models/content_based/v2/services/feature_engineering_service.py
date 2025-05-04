@@ -61,8 +61,8 @@ class FeatureEngineeringService:
                 'max_directors': 3,
                 'overview_tsvd_components': 200,
                 'keywords_tsvd_components': 100,
-                'cast_tsvd_components': 100,    # New parameter for cast dimension reduction
-                'director_tsvd_components': 100, # New parameter for director dimension reduction
+                'cast_tsvd_components': 100,
+                'director_tsvd_components': 100,
                 'random_state': 42
             }
             
@@ -238,12 +238,12 @@ class FeatureEngineeringService:
                 file_names['tfidf_overview']: feature_engineer.tfidf_overview,
                 file_names['tfidf_keywords']: feature_engineer.tfidf_keywords,
                 file_names['mlb_genres']: feature_engineer.mlb_genres,
-                'mlb_cast': feature_engineer.mlb_cast,                # New transformer
-                'mlb_director': feature_engineer.mlb_director,        # New transformer
-                'overview_tsvd': feature_engineer.overview_tsvd,
-                'keywords_tsvd': feature_engineer.keywords_tsvd,
-                'cast_tsvd': feature_engineer.cast_tsvd,              # New transformer
-                'director_tsvd': feature_engineer.director_tsvd       # New transformer
+                file_names['svd_overview']: feature_engineer.overview_tsvd,
+                file_names['svd_keywords']: feature_engineer.keywords_tsvd,
+                file_names['mlb_cast']: feature_engineer.mlb_cast,
+                file_names['mlb_director']: feature_engineer.mlb_director,
+                file_names['svd_cast']: feature_engineer.cast_tsvd,
+                file_names['svd_director']: feature_engineer.director_tsvd
             }
             
             # Save all transformers with compression
@@ -294,12 +294,12 @@ class FeatureEngineeringService:
             tfidf_overview_path = content_based_dir_path / f"{file_names['tfidf_overview']}.pkl"
             mlb_genres_path = content_based_dir_path / f"{file_names['mlb_genres']}.pkl"
             tfidf_keywords_path = content_based_dir_path / f"{file_names['tfidf_keywords']}.pkl"
-            mlb_cast_path = content_based_dir_path / "mlb_cast.pkl"
-            mlb_director_path = content_based_dir_path / "mlb_director.pkl"
-            overview_tsvd_path = content_based_dir_path / "overview_tsvd.pkl"
-            keywords_tsvd_path = content_based_dir_path / "keywords_tsvd.pkl"
-            cast_tsvd_path = content_based_dir_path / "cast_tsvd.pkl"
-            director_tsvd_path = content_based_dir_path / "director_tsvd.pkl"
+            mlb_cast_path = content_based_dir_path / f"{file_names['mlb_cast']}.pkl"
+            mlb_director_path = content_based_dir_path / f"{file_names['mlb_director']}.pkl"
+            overview_tsvd_path = content_based_dir_path / f"{file_names['svd_overview']}.pkl"
+            keywords_tsvd_path = content_based_dir_path / f"{file_names['svd_keywords']}.pkl"
+            cast_tsvd_path = content_based_dir_path / f"{file_names['svd_cast']}.pkl"
+            director_tsvd_path = content_based_dir_path / f"{file_names['svd_director']}.pkl"
             
             # Check if all required files exist
             for path, name in [

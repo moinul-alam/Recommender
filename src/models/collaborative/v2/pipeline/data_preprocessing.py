@@ -20,14 +20,14 @@ class DataPreprocessing:
         sparse_user_threshold: int = 5, 
         sparse_item_threshold: int = 5,
         split_percent: float = 0.8,
-        chunk_size: int = 10000
+        segment_size: int = 10000
     ):
         self._validate_parameters(sparse_user_threshold, sparse_item_threshold, split_percent)
         
         self.sparse_user_threshold = sparse_user_threshold
         self.sparse_item_threshold = sparse_item_threshold
         self.split_percent = split_percent
-        self.chunk_size = chunk_size
+        self.segment_size = segment_size
         
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -41,6 +41,7 @@ class DataPreprocessing:
 
     def drop_sparse_entities(self, df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Dropping sparse users and items...")
+        
         user_counts = df["user_id"].value_counts()
         valid_users = user_counts[user_counts >= self.sparse_user_threshold].index
         
@@ -87,8 +88,8 @@ class DataPreprocessing:
         
         rows, cols, data = [], [], []
         
-        for start in range(0, len(df), self.chunk_size):
-            end = start + self.chunk_size
+        for start in range(0, len(df), self.segment_size):
+            end = start + self.segment_size
             chunk = df.iloc[start:end]
             
             rows.extend(chunk["user_id"].values)
@@ -154,15 +155,16 @@ class DataPreprocessing:
             raise ValueError(f"Input dataframe must contain columns: {required_columns}")
 
         df = self.drop_sparse_entities(df)
-        df = self.handle_missing_values(df)
+        # df = self.handle_missing_values(df)
 
-        # **Split before dropping timestamp**
+        # Split before dropping timestamp**
         train, test = self.split_dataset(df)
 
+        # Create mappings after splitting
         train, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping = self.create_mappings(train)
         test["user_id"] = test["user_id"].map(user_mapping)
         test["tmdb_id"] = test["tmdb_id"].map(item_mapping)
-        test = test.dropna()  # Drop unmapped IDs
+        test = test.dropna()
 
         user_item_matrix = self.create_user_item_matrix(train)
 

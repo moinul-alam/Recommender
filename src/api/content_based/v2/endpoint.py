@@ -30,8 +30,12 @@ file_names = {
     "tfidf_overview": "4_tfidf_overview.pkl",
     "tfidf_keywords": "4_tfidf_keywords.pkl",
     "mlb_genres": "4_mlb_genres.pkl",
+    "mlb_cast": "4_mlb_cast.pkl",
+    "mlb_director": "4_mlb_director.pkl",
     "svd_overview": "4_svd_overview.pkl",
     "svd_keywords": "4_svd_keywords.pkl",
+    "svd_cast": "4_svd_cast.pkl",
+    "svd_director": "4_svd_director.pkl",
     "feature_matrix_name": "4_feature_matrix.pkl",
     "model_config_name": "4_model_config.pkl",
     "index_name": "5_similarity_index.faiss"
