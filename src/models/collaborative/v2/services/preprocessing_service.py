@@ -1,14 +1,10 @@
 import logging
-import os
-import json
 from pathlib import Path
-import pickle
-from typing import Dict, Optional
 from fastapi import HTTPException
-import pandas as pd
-from models.common.DataLoader import load_data
-from models.common.DataSaver import save_data
-from models.collaborative.v2.pipeline.data_preprocessing import DataPreprocessing
+from src.models.common.DataLoader import load_data
+from src.models.common.DataSaver import save_data, save_objects
+from src.models.collaborative.v2.pipeline.data_preprocessing import DataPreprocessing
+from src.schemas.content_based_schema import PipelineResponse
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +18,7 @@ class PreprocessingService:
         sparse_item_threshold: int = 5,
         split_percent: float = 0.8,
         segment_size: int = 10000,
-    ) -> Optional[Dict[str, str]]:
+    ) -> PipelineResponse:
         
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
@@ -37,7 +33,7 @@ class PreprocessingService:
                     detail=f"Invalid directory path: {collaborative_dir_path}"
                 )
             
-            # Locate datset file
+            # Locate dataset file
             dataset_path = collaborative_dir_path / file_names["dataset_name"]
             
             if not dataset_path.is_file():
@@ -64,44 +60,43 @@ class PreprocessingService:
             # Process data
             train, test, user_mapping, user_reverse_mapping, \
             item_mapping, item_reverse_mapping, \
-            user_item_matrix = preprocessor.process(df = dataset)
+            user_item_matrix = preprocessor.process(df=dataset)
             
-            print(list(item_mapping.items())[:5])
-            print(list(item_reverse_mapping.items())[:5])
+            logger.info(f"Preprocessing complete. Train set size: {len(train)}, Test set size: {len(test)}")
+            logger.info(f"User mapping size: {len(user_mapping)}, Item mapping size: {len(item_mapping)}")
             
-            # Prepare output paths
-            paths = {
-                "train_path": collaborative_dir_path / "2_train.feather",
-                "test_path": collaborative_dir_path / "2_test.feather",
-                "user_mapping_path": collaborative_dir_path / "2_user_mapping.pkl",
-                "user_reverse_mapping_path": collaborative_dir_path / "2_user_reverse_mapping.pkl",
-                "item_mapping_path": collaborative_dir_path / "2_item_mapping.pkl",
-                "item_reverse_mapping_path": collaborative_dir_path / "2_item_reverse_mapping.pkl",
-                "user_item_matrix_path": collaborative_dir_path / "2_user_item_matrix.pkl"
+            # Sample output for debugging
+            if len(item_mapping) > 0:
+                logger.info(f"Sample item mappings (first 5): {list(item_mapping.items())[:5]}")
+                logger.info(f"Sample item reverse mappings (first 5): {list(item_reverse_mapping.items())[:5]}")
+            
+            files_to_save = {
+                file_names["train_set"]: train,
+                file_names["test_set"]: test,
+                file_names["user_mapping"]: user_mapping,
+                file_names["user_reverse_mapping"]: user_reverse_mapping,
+                file_names["item_mapping"]: item_mapping,
+                file_names["item_reverse_mapping"]: item_reverse_mapping,
+                file_names["user_item_matrix"]: user_item_matrix
             }
+                
+            save_objects(
+                directory_path=collaborative_dir_path,
+                objects=files_to_save
+            )
             
-            # Save processed files
-            train.reset_index(drop=True).to_feather(paths["train_path"])
-            test.reset_index(drop=True).to_feather(paths["test_path"])
+            logger.info(f"Data saved successfully in {collaborative_dir_path}")
             
-            # Serialization utility for mappings
-            def safe_pickle_dump(obj, path):
-                try:
-                    with open(path, "wb") as f:
-                        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
-                except Exception as e:
-                    logger.error(f"Failed to save {path}: {e}", exc_info=True)
-
-            safe_pickle_dump(user_mapping, paths["user_mapping_path"])
-            safe_pickle_dump(user_reverse_mapping, paths["user_reverse_mapping_path"])
-            safe_pickle_dump(item_mapping, paths["item_mapping_path"])
-            safe_pickle_dump(item_reverse_mapping, paths["item_reverse_mapping_path"])
-            safe_pickle_dump(user_item_matrix, paths["user_item_matrix_path"])
-            
-            logger.info(f"Data preprocessing complete. Files saved in {collaborative_dir_path}")
-            
-            return {str(k): str(v) for k, v in paths.items()}
-        
+            return PipelineResponse(
+                status="success",
+                message="Data preprocessing completed successfully",
+                output=str(collaborative_dir_path)
+            )
+        except HTTPException:
+            raise            
         except Exception as e:
-            logger.error(f"Error during data preprocessing: {e}", exc_info=True)
-            return None
+            logger.error(f"An error occurred during data preprocessing: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"An error occurred during data preprocessing: {e}"
+            )

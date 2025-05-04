@@ -1,13 +1,8 @@
 import logging
-import os
-from typing import Dict, Tuple, Optional, Union
-import pathlib
+from typing import Tuple
 import pandas as pd
 import numpy as np
-import pickle
-from sklearn.model_selection import train_test_split
 from scipy import sparse
-from sklearn.preprocessing import normalize
 import gc
 
 # Configure global logging
@@ -52,14 +47,6 @@ class DataPreprocessing:
         
         logger.info(f"Filtered dataset: {len(valid_users)} users, {len(valid_items)} items remain.")
         return filtered_df
-
-    def handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
-        missing_count = df["rating"].isnull().sum()
-        if missing_count > 0:
-            mean_rating = df["rating"].mean()
-            df["rating"].fillna(mean_rating, inplace=True)
-            logger.info(f"Filled {missing_count} missing ratings with mean rating {mean_rating:.2f}")
-        return df
 
     def create_mappings(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, dict, dict, dict, dict]:
         logger.info("Creating item and user mappings...")
@@ -123,29 +110,43 @@ class DataPreprocessing:
         return user_item_matrix
 
     def split_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        logger.info("Performing time-aware train-test split...")
+        """Split dataset into training and test sets based on timestamp."""
+        logger.info("Splitting dataset into train and test sets...")
+        
+        if "timestamp" not in df.columns:
+            raise ValueError("Timestamp column required for time-aware splitting")
+        
+        train_list = []
+        test_list = []
 
-        df = df.sort_values(by=["user_id", "timestamp"])
+        # Ensure sorting is done only once
+        data_sorted = df.sort_values(by=['user_id', 'timestamp'])
 
-        train_list, test_list = [], []
+        # Split per user
+        for user_id, user_data in data_sorted.groupby('user_id'):
+            user_interactions = user_data.reset_index(drop=True)
+            cutoff = int(len(user_interactions) * self.split_percent)
 
-        for user, user_df in df.groupby("user_id"):
-            n_ratings = len(user_df)
+            # Split into train/test
+            train_user = user_interactions.iloc[:cutoff]
+            test_user = user_interactions.iloc[cutoff:]
 
-            if n_ratings < 2:  
-                train_list.append(user_df)  # Keep all in train if only one rating
-            else:
-                split_idx = int(n_ratings * self.split_percent)
-                train_list.append(user_df.iloc[:split_idx])
-                test_list.append(user_df.iloc[split_idx:])
+            train_list.append(train_user)
+            test_list.append(test_user)
 
-        train = pd.concat(train_list)
-        test = pd.concat(test_list)
+        # Concatenate all users' train/test interactions
+        train_data = pd.concat(train_list, ignore_index=True)
+        test_data = pd.concat(test_list, ignore_index=True)
 
-        test = test[test["user_id"].isin(train["user_id"])]  # Ensure all test users exist in train
+        # Optional: Filter test set to users/items seen in training
+        train_users = set(train_data['user_id'])
+        train_items = set(train_data['tmdb_id'])
 
-        logger.info(f"Train-test split complete: Train size {len(train)}, Test size {len(test)}")
-        return train.drop(columns=["timestamp"]), test.drop(columns=["timestamp"])
+        test_data = test_data[test_data['user_id'].isin(train_users)]
+        test_data = test_data[test_data['tmdb_id'].isin(train_items)]
+
+        logger.info(f"Split dataset: {len(train_data)} training samples, {len(test_data)} test samples")
+        return train_data, test_data
 
     def process(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, dict, dict, dict, dict, sparse.csr_matrix]:
         logger.info("Starting data preprocessing pipeline...")
@@ -154,18 +155,27 @@ class DataPreprocessing:
         if not all(col in df.columns for col in required_columns):
             raise ValueError(f"Input dataframe must contain columns: {required_columns}")
 
+        # Filter sparse entities first
         df = self.drop_sparse_entities(df)
-        # df = self.handle_missing_values(df)
 
-        # Split before dropping timestamp**
+        # Split data into train and test sets
         train, test = self.split_dataset(df)
 
-        # Create mappings after splitting
-        train, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping = self.create_mappings(train)
+        # Create mappings based on the complete dataset to ensure consistency
+        df_combined, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping = self.create_mappings(df)
+        
+        # Apply mappings to train and test data
+        train["user_id"] = train["user_id"].map(user_mapping)
+        train["tmdb_id"] = train["tmdb_id"].map(item_mapping)
+        
+        test_size_before = len(test)
         test["user_id"] = test["user_id"].map(user_mapping)
         test["tmdb_id"] = test["tmdb_id"].map(item_mapping)
         test = test.dropna()
+        
+        logger.info(f"Dropped {test_size_before - len(test)} rows from test due to unmapped users/items.")
 
+        # Create user-item matrix from training data
         user_item_matrix = self.create_user_item_matrix(train)
 
         logger.info("Data preprocessing completed successfully.")

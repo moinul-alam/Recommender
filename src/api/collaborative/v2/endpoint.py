@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from src.config.config import BaseConfig
 
 from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
-from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
+from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.model_evaluation_service import ModelEvaluationService
@@ -28,19 +28,18 @@ collaborative_router_v2 = APIRouter()
 # Define constants for dataset/file/model names
 file_names = {
     "dataset_name": "1_movielens_dataset.csv",
-    # "prepared_dataset_name": "2_prepared_dataset.csv",
-    # "item_map_name": "2_item_map.csv",
-    # "preprocessed_dataset_name": "3_preprocessed_dataset.csv",
-    # "preprocessed_segment_name": "3_processed_segment_",
-    # "tfidf_overview": "4_tfidf_overview.pkl",
-    # "tfidf_keywords": "4_tfidf_keywords.pkl",
-    # "mlb_genres": "4_mlb_genres.pkl",
-    # "svd_overview": "4_svd_overview.pkl",
-    # "svd_keywords": "4_svd_keywords.pkl",
-    # "pca": "4_pca.pkl",
-    # "feature_matrix_name": "4_feature_matrix.pkl",
-    # "model_config_name": "4_model_config.pkl",
-    # "index_name": "5_similarity_index.faiss"
+    "train_set": "2_train_set.pkl",
+    "test_set": "2_test_set.pkl",
+    "user_mapping": "2_user_mapping.pkl",
+    "user_reverse_mapping": "2_user_reverse_mapping.pkl",
+    "item_mapping": "2_item_mapping.pkl",
+    "item_reverse_mapping": "2_item_reverse_mapping.pkl",
+    "user_item_matrix": "2_user_item_matrix.pkl",
+    "user_matrix": "3_user_matrix.pkl",
+    "item_matrix": "3_item_matrix.pkl",
+    "svd_user_model": "3_svd_user_model.pkl",
+    "svd_item_model": "3_svd_item_model.pkl",
+    "model_info": "3_model_info.pkl",
 }
 
 """
@@ -86,49 +85,51 @@ async def process_data(
 """
 Feature Engineering and Dimensionality Reduction
 """
-@collaborative_router_v2.post("/model-training")
-def train_model(
+@collaborative_router_v2.post("/feature-extraction")
+def extrac_features(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
     ),
-    n_neighbors: Optional[int] = Query(
-        default=100, 
-        description="Number of nearest neighbors to consider"
+    n_components_item: int = Query(
+        default=200, 
+        description="Number of components for item SVD"
     ),
-    similarity_metric: str = Query(
-        default='cosine', 
-        description="Similarity calculation method (euclidean/cosine)"
+    n_components_user: int = Query(
+        default=200, 
+        description="Number of components for user SVD"
     ),
-    min_similarity: float = Query(
-        default=0.1, 
-        description="Minimum similarity threshold"
+    batch_size: int = Query(
+        default=20000, 
+        description="Batch size for processing"
     )
 ):
     logger.info(
         f"Model training request received | "
         f"Directory Path: {collaborative_dir_path}"
-        f"Neighbors: {n_neighbors}, Similarity: {similarity_metric}"
+        f"n_components_item: {n_components_item} | "
+        f"n_components_user: {n_components_user}"
     )
 
     try:
-        result = ModelTrainingService.train_model(
-            collaborative_dir_path=collaborative_dir_path,
-            n_neighbors=n_neighbors,
-            similarity_metric=similarity_metric,
-            min_similarity=min_similarity
+        result = FeatureExtractionService.extract_features(
+            collaborative_dir_path,
+            file_names,
+            n_components_item,
+            n_components_user,
+            batch_size
         ) 
         
         if not result:
-            logger.error("Model training failed due to missing or incorrect data.")
-            raise HTTPException(status_code=400, detail="Model training failed. Check dataset and parameters.")
+            logger.error("Feature Extraction failed due to missing or incorrect data.")
+            raise HTTPException(status_code=400, detail="Feature Extraction failed. Check dataset and parameters.")
         
-        logger.info(f"Model training completed successfully. Output: {result}")
+        logger.info(f"Feature Extraction completed successfully. Output: {result}")
         return result
     
     except Exception as e:
-        logger.error(f"Unexpected error during model training: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error during model training.")
+        logger.error(f"Unexpected error during Feature Extraction: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during Feature Extraction.")
 
 
 @collaborative_router_v2.post("/recommendations/item-based")
