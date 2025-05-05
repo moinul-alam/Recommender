@@ -3,7 +3,7 @@ import logging
 import joblib
 import pandas as pd
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Union
 
 
 # Configure logging
@@ -93,3 +93,28 @@ def load_object(file_path: str) -> Any:
     This is an alias for load_from_pickle, providing consistent naming with save_object.
     """
     return load_from_pickle(file_path)
+
+def load_multiple(directory_path: str, objects: dict, **kwargs) -> dict:
+    """
+    Load multiple objects from a given directory.
+
+    Args:
+        directory_path: Base directory path where files are located.
+        objects: A dictionary mapping keys (e.g., "item_matrix") to filenames.
+        **kwargs: Extra args passed to specific loaders (like for CSVs).
+
+    Returns:
+        A dictionary where keys are the same as input keys and values are the loaded objects.
+    """
+    results = {}
+
+    for key, file_name in objects.items():
+        file_path = Path(directory_path) / file_name
+        try:
+            results[key] = load_data(str(file_path), **kwargs)
+        except Exception as e:
+            logger.warning(f"Failed to load {key} from {file_path}: {e}")
+            results[key] = None  # Optional: Skip or raise
+
+    return results
+

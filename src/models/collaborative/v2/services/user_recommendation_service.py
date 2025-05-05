@@ -1,7 +1,7 @@
 from typing import Dict, List
 import logging
 from fastapi import HTTPException
-from src.models.collaborative.v2.pipeline.Recommender import UserRecommender
+from src.models.collaborative.v2.pipeline.recommender import UserRecommender
 from src.models.collaborative.v2.services.base_recommendation_service import BaseRecommendationService
 
 logger = logging.getLogger(__name__)
@@ -11,6 +11,7 @@ class UserRecommendationService:
     def get_user_recommendations(
         user_ratings: Dict[str, float],
         collaborative_dir_path: str,
+        file_names: dict,
         n_recommendations: int,
         min_similarity: float
     ) -> List[Dict]:
@@ -25,8 +26,8 @@ class UserRecommendationService:
                 raise HTTPException(status_code=400, detail="Invalid rating format")
 
             # Load model components
-            components = BaseRecommendationService.load_model_components(collaborative_dir_path)
-            user_item_matrix, user_mapping, user_reverse_mapping, user_matrix, item_mapping, item_reverse_mapping, item_matrix, svd_user_model, svd_item_model, model_info, faiss_user_index, faiss_item_index = components
+            components = BaseRecommendationService.load_model_components(collaborative_dir_path, file_names)
+            user_item_matrix, user_mapping, user_reverse_mapping, user_matrix, item_mapping, item_reverse_mapping, item_matrix, faiss_user_index, faiss_item_index = components
 
             # Initialize recommender
             recommender = UserRecommender(
@@ -34,7 +35,6 @@ class UserRecommendationService:
                 user_embedding_matrix=user_matrix,
                 faiss_item_index=faiss_item_index,
                 item_embedding_matrix=item_matrix,
-                svd_user_model=svd_user_model,
                 user_item_matrix=user_item_matrix,
                 item_mapping=item_mapping,
                 item_reverse_mapping=item_reverse_mapping,

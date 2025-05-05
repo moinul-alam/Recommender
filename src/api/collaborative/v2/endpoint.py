@@ -55,8 +55,8 @@ async def process_data(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
     ),
-    sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
-    sparse_item_threshold: int = Query(5, description="Minimum ratings per item"),
+    sparse_user_threshold: int = Query(10, description="Minimum ratings per user"),
+    sparse_item_threshold: int = Query(10, description="Minimum ratings per item"),
     train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
     segment_size: int = Query(10000, description="Segment size for processing")
 ):
@@ -96,11 +96,11 @@ def extract_features(
         description="Path to the directory containing dataset and model files"
     ),
     n_components_item: int = Query(
-        default=200, 
+        default=300, 
         description="Number of components for item SVD"
     ),
     n_components_user: int = Query(
-        default=200, 
+        default=300, 
         description="Number of components for user SVD"
     ),
     batch_size: int = Query(
@@ -173,6 +173,9 @@ def create_index(
         logger.error(f"Unexpected error during Index Creation: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during Index Creation.")
 
+"""
+Item based Recommendation Endpoints
+"""
 @collaborative_router_v2.post("/recommendations/item-based")
 def get_item_recommendations(
     items: List[int] = Body(
@@ -189,7 +192,7 @@ def get_item_recommendations(
         le=100
     ),
     min_similarity: float = Query(
-        default=0.1,
+        default=0.0,
         ge=0.0,
         le=1.0
     )
@@ -199,10 +202,11 @@ def get_item_recommendations(
         logger.info(f'Generating item-based recommendations for {len(items)} items')
 
         recommendations = ItemRecommendationService.get_item_recommendations(
-            items=items,
-            collaborative_dir_path=collaborative_dir_path,
-            n_recommendations=n_recommendations,
-            min_similarity=min_similarity
+            items,
+            collaborative_dir_path,
+            file_names,
+            n_recommendations,
+            min_similarity
         )
 
         if not recommendations:
@@ -243,10 +247,11 @@ def get_user_recommendations(
         logger.info(f'Generating user-based recommendations for {len(user_ratings)} rated items')
 
         recommendations = UserRecommendationService.get_user_recommendations(
-            user_ratings=user_ratings,
-            collaborative_dir_path=collaborative_dir_path,
-            n_recommendations=n_recommendations,
-            min_similarity=min_similarity
+            user_ratings,
+            collaborative_dir_path,
+            file_names,
+            n_recommendations,
+            min_similarity
         )
 
         if not recommendations:

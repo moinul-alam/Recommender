@@ -5,7 +5,6 @@ from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.index_creation import IndexCreation
 from src.models.common.DataLoader import load_data
 from src.models.common.DataSaver import save_data, save_objects
-import faiss
 
 from src.schemas.content_based_schema import PipelineResponse
 

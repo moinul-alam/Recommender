@@ -31,35 +31,12 @@ class BaseRecommender:
             if self.item_mapping.get(tmdb_id) is not None
         ]
 
-    # def _convert_distance_to_similarity(self, distance: float, max_distance: float) -> float:
-    #     """Converts FAISS distance to a similarity percentage."""
-    #     return max(0, min(100, (1 - (distance / max_distance)) * 100))
     def _convert_distance_to_similarity(self, inner_product: float) -> float:
         """Converts FAISS inner product to a similarity percentage."""
         return max(0, min(100, (inner_product + 1) * 50))
 
 class UserRecommender(BaseRecommender):
     """Generates recommendations based on user similarity (collaborative filtering)."""
-
-    def __init__(
-        self,
-        faiss_user_index: faiss.Index,
-        user_embedding_matrix: np.ndarray,
-        faiss_item_index: faiss.Index,
-        item_embedding_matrix: np.ndarray,
-        svd_user_model: object,
-        user_item_matrix: sparse.csr_matrix,
-        item_mapping: Dict[int, int],
-        item_reverse_mapping: Dict[int, int],
-        min_similarity: float,
-        n_neighbors: int = 100
-    ):
-        super().__init__(faiss_item_index, item_embedding_matrix, item_mapping, item_reverse_mapping, min_similarity)
-        self.faiss_user_index = faiss_user_index
-        self.user_embedding_matrix = user_embedding_matrix
-        self.svd_user_model = svd_user_model
-        self.user_item_matrix = user_item_matrix
-        self.n_neighbors = n_neighbors
 
     def generate_recommendations(self, items: Dict[int, float], n_recommendations: int) -> List[Dict]:
         """Generates movie recommendations for a user based on similar users."""
@@ -175,11 +152,11 @@ class UserRecommender(BaseRecommender):
 class ItemRecommender(BaseRecommender):
     """Generates recommendations based on item similarity (content-based filtering)."""
 
-    def generate_recommendations(self, tmdb_ids: List[int], n_recommendations: int) -> List[Dict]:
+    def generate_recommendations(self, item_ids: List[int], n_recommendations: int) -> List[Dict]:
         """Finds similar items for multiple movies (content-based filtering)."""
         try:
             # Map TMDB IDs to internal indices
-            item_indices = [self.item_mapping.get(tmdb_id) for tmdb_id in tmdb_ids if tmdb_id in self.item_mapping]
+            item_indices = [self.item_mapping.get(tmdb_id) for tmdb_id in item_ids if tmdb_id in self.item_mapping]
             if not item_indices:
                 return []
 
