@@ -4,8 +4,10 @@ from fastapi import APIRouter, Body, HTTPException, Query
 
 from src.config.config import BaseConfig
 
-from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
+from src.models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
+from src.models.collaborative.v2.services.indexing_service import IndexingService
+
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.model_evaluation_service import ModelEvaluationService
@@ -40,6 +42,8 @@ file_names = {
     "svd_user_model": "3_svd_user_model.pkl",
     "svd_item_model": "3_svd_item_model.pkl",
     "model_info": "3_model_info.pkl",
+    "faiss_user_index": "4_user_index.faiss",
+    "faiss_item_index": "4_item_index.faiss",
 }
 
 """
@@ -61,7 +65,7 @@ async def process_data(
     )
 
     try:
-        result = PreprocessingService.process_data(
+        result = DataPreprocessingService.process_data(
             collaborative_dir_path,
             file_names,
             sparse_user_threshold,
@@ -86,7 +90,7 @@ async def process_data(
 Feature Engineering and Dimensionality Reduction
 """
 @collaborative_router_v2.post("/feature-extraction")
-def extrac_features(
+def extract_features(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
@@ -131,6 +135,43 @@ def extrac_features(
         logger.error(f"Unexpected error during Feature Extraction: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during Feature Extraction.")
 
+
+"""
+Index Creation
+"""
+@collaborative_router_v2.post("/create-index")
+def create_index(
+    collaborative_dir_path: str = Query(
+        default=str(collaborative_dir_path),
+        description="Path to the directory containing dataset and model files"
+    ),
+    similarity_metric: str = Query(
+        default='cosine', 
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
+    batch_size: int = Query(
+        default=10000, 
+        description="Batch size for similarity matrix computation"
+    )
+):
+    try:
+        result = IndexingService.create_index(
+            collaborative_dir_path,
+            file_names,
+            similarity_metric,
+            batch_size
+        )
+        
+        if not result:
+            logger.error("Index creation failed due to missing or incorrect data.")
+            raise HTTPException(status_code=400, detail="Index creation failed. Check dataset and parameters.")
+        
+        logger.info(f"Index created successfully. Output: {result}")
+        return result
+    
+    except Exception as e:
+        logger.error(f"Unexpected error during Index Creation: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during Index Creation.")
 
 @collaborative_router_v2.post("/recommendations/item-based")
 def get_item_recommendations(

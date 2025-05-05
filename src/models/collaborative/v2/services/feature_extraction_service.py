@@ -1,8 +1,5 @@
 import logging
-import pickle
 from pathlib import Path
-from typing import Dict, Optional
-
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.feature_extraction import FeatureExtraction
 from src.models.common.DataLoader import load_data
@@ -64,7 +61,8 @@ class FeatureExtractionService:
             
             save_objects(
                 directory_path=collaborative_dir_path,
-                objects=files_to_save
+                objects=files_to_save,
+                compress=3
             )
             
             logger.info(f"Model components saved successfully.")

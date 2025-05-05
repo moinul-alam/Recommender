@@ -1,11 +1,10 @@
-import os
 import logging
 import joblib
 import pandas as pd
 from pathlib import Path
 from typing import Union, Dict, Any, Optional
 
-# Configure logging with function name for better traceability
+# Configure logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
@@ -13,19 +12,7 @@ logging.basicConfig(
 )
 
 def save_to_csv(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
-    """Save DataFrame to a CSV file.
-
-    Args:
-        df: DataFrame to save.
-        file_path: Path to the CSV file.
-        **kwargs: Additional arguments for pandas.to_csv (e.g., index, encoding).
-
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        Exception: If saving fails.
-    """
+    """Save DataFrame to a CSV file."""
     try:
         str_path = str(file_path)
         logger.info(f"Saving CSV to {str_path}")
@@ -37,19 +24,7 @@ def save_to_csv(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
         raise
 
 def save_to_json(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
-    """Save DataFrame to a JSON file.
-
-    Args:
-        df: DataFrame to save.
-        file_path: Path to the JSON file.
-        **kwargs: Additional arguments for pandas.to_json (e.g., orient, lines).
-
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        Exception: If saving fails.
-    """
+    """Save DataFrame to a JSON file."""
     try:
         str_path = str(file_path)
         logger.info(f"Saving JSON to {str_path}")
@@ -60,23 +35,13 @@ def save_to_json(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str
         logger.error(f"Error saving JSON file {file_path}: {e}")
         raise
 
-def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
-    """Save DataFrame to a pickle file.
-
-    Args:
-        df: DataFrame to save.
-        file_path: Path to the pickle file.
-
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        Exception: If saving fails.
-    """
+def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path], protocol: int = 4) -> str:
+    """Save DataFrame to a pickle file with consistent protocol."""
     try:
         str_path = str(file_path)
-        logger.info(f"Saving Pickle to {str_path}")
-        df.to_pickle(file_path)
+        logger.info(f"Saving Pickle to {str_path} with protocol {protocol}")
+        # Use joblib for all pickle saves
+        joblib.dump(df, file_path, compress=3, protocol=protocol)
         logger.info(f"Data saved to pickle: {str_path}")
         return str_path
     except Exception as e:
@@ -84,18 +49,7 @@ def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
         raise
 
 def save_to_feather(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
-    """Save DataFrame to a feather file.
-
-    Args:
-        df: DataFrame to save.
-        file_path: Path to the feather file.
-
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        Exception: If saving fails or required libraries (pyarrow/fastparquet) are not installed.
-    """
+    """Save DataFrame to a feather file."""
     try:
         import pyarrow  # Check if pyarrow is installed
         str_path = str(file_path)
@@ -119,20 +73,6 @@ def save_data(
 ) -> str:
     """
     Save DataFrame to a file with specified directory, name, and type.
-    
-    Args:
-        directory_path: Path to the directory where file will be saved.
-        df: DataFrame to save.
-        file_name: Name of the file (without extension).
-        file_type: Type of file to save ('csv', 'json', 'pkl', 'feather').
-        **kwargs: Additional arguments for the respective save function (e.g., index for to_csv).
-        
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        ValueError: If the DataFrame is empty or file_type is unsupported.
-        Exception: If saving fails.
     """
     # Validate inputs
     if df.empty:
@@ -156,11 +96,15 @@ def save_data(
     save_functions = {
         'csv': save_to_csv,
         'json': save_to_json,
-        'pkl': save_to_pickle,  # Reverted to 'pkl' as per user preference
+        'pkl': save_to_pickle,
+        'pickle': save_to_pickle,
         'feather': save_to_feather
     }
     
     if file_type in save_functions:
+        if file_type in ['pkl', 'pickle'] and 'protocol' not in kwargs:
+            # Set default protocol for pickle files
+            kwargs['protocol'] = 4
         return save_functions[file_type](df, file_path, **kwargs)
     else:
         logger.warning(
@@ -177,19 +121,6 @@ def save_multiple_dataframes(
 ) -> Dict[str, str]:
     """
     Save multiple DataFrames to files in the specified directory.
-    
-    Args:
-        directory_path: Path to the directory where files will be saved.
-        dataframes: Dictionary mapping file names to DataFrames.
-        file_type: Type of file to save ('csv', 'json', 'pkl', 'feather').
-        **kwargs: Additional arguments for the respective save function.
-        
-    Returns:
-        Dict[str, str]: Dictionary mapping file names to saved file paths.
-
-    Raises:
-        ValueError: If any DataFrame is empty.
-        Exception: If saving fails.
     """
     saved_paths = {}
     for file_name, df in dataframes.items():
@@ -202,23 +133,11 @@ def save_object(
     directory_path: Union[str, Path],
     obj: Any,
     file_name: str,
-    compress: Optional[int] = None
+    protocol: int = 4,
+    compress: int = 3
 ) -> str:
     """
-    Save any Python object (like ML models) to a pickle file.
-    
-    Args:
-        directory_path: Path to the directory where file will be saved.
-        obj: Object to save.
-        file_name: Name of the file (without extension).
-        compress: Compression level (0-9, None for no compression).
-        
-    Returns:
-        str: Full path to the saved file.
-
-    Raises:
-        ValueError: If compress is not None or an integer between 0 and 9.
-        Exception: If saving fails.
+    Save any Python object to a pickle file using joblib.
     """
     # Validate compression level
     if compress is not None and not (isinstance(compress, int) and 0 <= compress <= 9):
@@ -239,8 +158,8 @@ def save_object(
     
     try:
         str_path = str(file_path)
-        logger.info(f"Saving object to {str_path}")
-        joblib.dump(obj, file_path, compress=compress)
+        logger.info(f"Saving object to {str_path} with protocol {protocol}")
+        joblib.dump(obj, file_path, compress=compress, protocol=protocol)
         logger.info(f"Object saved to: {str_path}")
         return str_path
     except Exception as e:
@@ -250,26 +169,15 @@ def save_object(
 def save_objects(
     directory_path: Union[str, Path],
     objects: Dict[str, Any],
-    compress: Optional[int] = None
+    protocol: int = 4,
+    compress: int = 3
 ) -> Dict[str, str]:
     """
     Save multiple objects to pickle files in the specified directory.
-    
-    Args:
-        directory_path: Path to the directory where files will be saved.
-        objects: Dictionary mapping file names to objects.
-        compress: Compression level (0-9, None for no compression).
-        
-    Returns:
-        Dict[str, str]: Dictionary mapping file names to saved file paths.
-
-    Raises:
-        ValueError: If compress is invalid.
-        Exception: If saving fails.
     """
     saved_paths = {}
     for file_name, obj in objects.items():
-        saved_path = save_object(directory_path, obj, file_name, compress=compress)
+        saved_path = save_object(directory_path, obj, file_name, protocol=protocol, compress=compress)
         saved_paths[file_name] = saved_path
     
     return saved_paths

@@ -9,7 +9,7 @@ from src.schemas.content_based_schema import PipelineResponse
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class PreprocessingService:    
+class DataPreprocessingService:    
     @staticmethod
     def process_data(
         collaborative_dir_path: str,
@@ -82,7 +82,8 @@ class PreprocessingService:
                 
             save_objects(
                 directory_path=collaborative_dir_path,
-                objects=files_to_save
+                objects=files_to_save,
+                compress=3
             )
             
             logger.info(f"Data saved successfully in {collaborative_dir_path}")

@@ -1,8 +1,8 @@
 import os
 import logging
 from fastapi import HTTPException
-from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
-from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
+from models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
+from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ class PipelineService:
                 elif not os.path.isdir(path):
                     raise ValueError(f"Provided path '{path}' is not a directory")
 
-            preprocessing_result = PreprocessingService.process_data(
+            preprocessing_result = DataPreprocessingService.process_data(
                 dataset_dir_path=dataset_dir_path,
                 processed_dir_path=processed_dir_path,
                 sparse_user_threshold=sparse_user_threshold,
@@ -43,7 +43,7 @@ class PipelineService:
             if not preprocessing_result:
                 return {"status": "Preprocessing failed"}
 
-            training_result = ModelTrainingService.train_model(
+            training_result = FeatureExtractionService.extract_features(
                 processed_dir_path=processed_dir_path,
                 model_dir_path=model_dir_path,
                 n_neighbors=n_neighbors,

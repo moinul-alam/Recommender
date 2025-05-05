@@ -1,11 +1,15 @@
 import json
 import logging
+import joblib
 import pandas as pd
 from pathlib import Path
+from typing import Any
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def load_from_json(file_path: str) -> pd.DataFrame:
     """Load data from a JSON file."""
@@ -25,10 +29,11 @@ def load_from_csv(file_path: str, **kwargs) -> pd.DataFrame:
         logger.error(f"Error loading CSV file {file_path}: {e}")
         raise
 
-def load_from_pickle(file_path: str) -> pd.DataFrame:
-    """Load data from a pickle file."""
+def load_from_pickle(file_path: str) -> Any:
+    """Load data from a pickle file using joblib."""
     try:
-        return pd.read_pickle(file_path)
+        logger.info(f"Loading pickle file with joblib: {file_path}")
+        return joblib.load(file_path)
     except Exception as e:
         logger.error(f"Error loading pickle file {file_path}: {e}")
         raise
@@ -41,7 +46,7 @@ def load_from_feather(file_path: str) -> pd.DataFrame:
         logger.error(f"Error loading feather file {file_path}: {e}")
         raise
 
-def load_data(file_path: str, **kwargs) -> pd.DataFrame:
+def load_data(file_path: str, **kwargs) -> Any:
     """
     Load data from a file based on the extension in the file path.
     
@@ -50,7 +55,7 @@ def load_data(file_path: str, **kwargs) -> pd.DataFrame:
         **kwargs: Additional arguments to pass to the loading function
         
     Returns:
-        Loaded DataFrame
+        Loaded DataFrame or object
     
     Raises:
         FileNotFoundError: If the file doesn't exist
@@ -80,3 +85,11 @@ def load_data(file_path: str, **kwargs) -> pd.DataFrame:
     
     logger.info(f"Loading {file_ext.upper()} file: {file_path}")
     return loader(file_path, **kwargs) if file_ext == 'csv' else loader(file_path)
+
+def load_object(file_path: str) -> Any:
+    """
+    Load any Python object from a pickle file using joblib.
+    
+    This is an alias for load_from_pickle, providing consistent naming with save_object.
+    """
+    return load_from_pickle(file_path)

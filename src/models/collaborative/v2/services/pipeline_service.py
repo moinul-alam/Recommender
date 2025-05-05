@@ -2,8 +2,8 @@ import os
 import logging
 import pathlib
 from fastapi import HTTPException
-from src.models.collaborative.v2.services.preprocessing_service import PreprocessingService
-from src.models.collaborative.v2.services.model_training_service import ModelTrainingService
+from models.collaborative.v2.services.data_preprocessing_service import PreprocessingService
+from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +42,7 @@ class PipelineService:
             if not preprocessing_result:
                 return {"status": "Preprocessing failed"}
 
-            training_result = ModelTrainingService.train_model(
+            training_result = FeatureExtractionService.extract_features(
                 collaborative_dir_path=collaborative_dir_path,
                 n_neighbors=n_neighbors,
                 similarity_metric=similarity_metric,
