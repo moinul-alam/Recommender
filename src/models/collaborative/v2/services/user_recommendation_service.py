@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 import logging
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.recommender import UserRecommender
@@ -13,8 +13,9 @@ class UserRecommendationService:
         collaborative_dir_path: str,
         file_names: dict,
         n_recommendations: int,
+        similarity_metric: str,
         min_similarity: float,
-        n_neighbors: int = 50
+        n_neighbors: Optional[int] = 50
     ) -> List[Dict]:
         """
         Generate user-based recommendations based on user ratings.
@@ -54,12 +55,13 @@ class UserRecommendationService:
                 item_mapping=item_mapping,
                 item_reverse_mapping=item_reverse_mapping,
                 svd_user_model=svd_user_model,
+                similarity_metric=similarity_metric,
                 min_similarity=min_similarity,
                 n_neighbors=n_neighbors
             )
 
             recommendations = recommender.generate_recommendations(
-                items=user_ratings,
+                user_ratings=user_ratings,
                 n_recommendations=n_recommendations
             )
 

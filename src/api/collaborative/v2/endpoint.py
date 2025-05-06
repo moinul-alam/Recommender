@@ -11,7 +11,7 @@ from src.models.collaborative.v2.services.indexing_service import IndexingServic
 
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
-from src.models.collaborative.v2.services.model_evaluation_service import ModelEvaluationService
+from src.models.collaborative.v2.services.evaluation_service import EvaluationService
 
 # from src.models.collaborative.v2.services.svd_service import SVDService
   
@@ -235,6 +235,10 @@ def get_user_recommendations(
         ge=1,
         le=100
     ),
+    similarity_metric: str = Query(
+        default='cosine',
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
     min_similarity: float = Query(
         default=0,
         ge=0.0,
@@ -250,6 +254,7 @@ def get_user_recommendations(
             collaborative_dir_path,
             file_names,
             n_recommendations,
+            similarity_metric,
             min_similarity
         )
 
@@ -265,8 +270,8 @@ def get_user_recommendations(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@collaborative_router_v2.post("/evaluate-model")
-def evaluate_model(
+@collaborative_router_v2.post("/evaluation")
+def evaluate(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to preprocessed dataset"
@@ -274,11 +279,24 @@ def evaluate_model(
     sample_size: int = Query(
         default=100,
     ),
+    n_recommendations: int = Query(
+        default=10,
+        ge=1,
+        le=100
+    ),
+    min_similarity: float = Query(
+        default=0.1,
+        ge=0.0,
+        le=1.0
+    )
 ):
     try:
-        results = ModelEvaluationService.evaluate_model(
-            collaborative_dir_path=collaborative_dir_path
-            
+        results = EvaluationService.evaluate_recommender(
+            collaborative_dir_path,
+            file_names,
+            sample_size,
+            n_recommendations,
+            min_similarity 
         )
         return results
     except ValueError as ve:

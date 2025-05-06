@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 import logging
-from src.models.collaborative.v2.pipeline.Recommender import BaseRecommender
+from src.models.collaborative.v2.pipeline.recommender import BaseRecommender
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class RecommendationService:
         processed_dir_path: str,
         model_dir_path: str,
         n_recommendations: int,
+        
         min_similarity: float
     ) -> List[Dict]:
         try:
