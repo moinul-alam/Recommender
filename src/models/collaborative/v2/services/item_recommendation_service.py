@@ -4,9 +4,6 @@ from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.recommender import ItemRecommender
 from src.models.collaborative.v2.services.base_recommendation_service import BaseRecommendationService
 
-from src.schemas.content_based_schema import PipelineResponse
-
-
 logger = logging.getLogger(__name__)
 
 class ItemRecommendationService:
@@ -17,7 +14,20 @@ class ItemRecommendationService:
         file_names: dict,
         n_recommendations: int,
         min_similarity: float
-    ) -> Optional[PipelineResponse]:
+    ) -> List[Dict]:
+        """
+        Generate item-based recommendations based on a list of item IDs.
+        
+        Args:
+            items: List of item IDs to base recommendations on
+            collaborative_dir_path: Directory path containing model files
+            file_names: Dictionary mapping component names to filenames
+            n_recommendations: Number of recommendations to return
+            min_similarity: Minimum similarity threshold for recommendations
+            
+        Returns:
+            List of recommendation dictionaries with tmdb_id and similarity
+        """
         try:
             logger.info(f"Received items for item-based recommendations: {items}")
 
@@ -30,7 +40,7 @@ class ItemRecommendationService:
 
             # Load model components
             components = BaseRecommendationService.load_model_components(collaborative_dir_path, file_names)
-            _, _, _, _, item_mapping, item_reverse_mapping, item_matrix, _, faiss_item_index = components
+            _, _, _, _, item_mapping, item_reverse_mapping, item_matrix, _, faiss_item_index, _ = components
 
             # Initialize recommender
             recommender = ItemRecommender(
@@ -47,8 +57,8 @@ class ItemRecommendationService:
             )
 
             logger.info(f"Generated {len(recommendations)} item-based recommendations")
-            return recommendations if recommendations else {"message": "No recommendations found"}
+            return recommendations if recommendations else []
 
         except Exception as e:
             logger.error(f"Error in generating item-based recommendations: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to generate recommendations")
+            raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")

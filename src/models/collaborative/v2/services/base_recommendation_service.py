@@ -11,13 +11,22 @@ class BaseRecommendationService:
         "user_item_matrix", "user_mapping", "user_reverse_mapping",
         "item_mapping", "item_reverse_mapping",
         "user_matrix", "item_matrix",
-        "faiss_user_index", "faiss_item_index"
+        "faiss_user_index", "faiss_item_index",
+        "svd_user_model"
     ]
 
     @staticmethod
     def load_model_components(collaborative_dir_path: str, file_names: dict) -> tuple:
-        """Loads all required model components and FAISS indices."""
-
+        """
+        Loads all required model components and FAISS indices.
+        
+        Args:
+            collaborative_dir_path: Directory path containing model files
+            file_names: Dictionary mapping component names to filenames
+            
+        Returns:
+            Tuple of model components needed for recommendations
+        """
         # Validate input
         BaseRecommendationService._validate_file_keys(file_names)
 
@@ -35,7 +44,8 @@ class BaseRecommendationService:
             item_mapping,
             item_reverse_mapping,
             user_matrix,
-            item_matrix
+            item_matrix,
+            svd_user_model
         ) = (
             components["user_item_matrix"],
             components["user_mapping"],
@@ -43,7 +53,8 @@ class BaseRecommendationService:
             components["item_mapping"],
             components["item_reverse_mapping"],
             components["user_matrix"],
-            components["item_matrix"]
+            components["item_matrix"],
+            components["svd_user_model"]
         )
 
         # Load FAISS indices
@@ -60,11 +71,13 @@ class BaseRecommendationService:
             item_reverse_mapping,
             item_matrix,
             faiss_user_index,
-            faiss_item_index
+            faiss_item_index,
+            svd_user_model
         )
 
     @staticmethod
     def _validate_file_keys(file_names: dict):
+        """Validates that all required file keys are present in the provided dictionary."""
         missing_keys = [
             key for key in BaseRecommendationService.REQUIRED_KEYS if key not in file_names
         ]
@@ -74,6 +87,7 @@ class BaseRecommendationService:
 
     @staticmethod
     def _load_data_components(path: Path, file_names: dict) -> dict:
+        """Loads model data components from files."""
         files_to_load = {
             "user_item_matrix": file_names["user_item_matrix"],
             "user_mapping": file_names["user_mapping"],
@@ -81,7 +95,8 @@ class BaseRecommendationService:
             "item_mapping": file_names["item_mapping"],
             "item_reverse_mapping": file_names["item_reverse_mapping"],
             "user_matrix": file_names["user_matrix"],
-            "item_matrix": file_names["item_matrix"]
+            "item_matrix": file_names["item_matrix"],
+            "svd_user_model": file_names["svd_user_model"]
         }
 
         try:
@@ -93,6 +108,7 @@ class BaseRecommendationService:
 
     @staticmethod
     def _load_faiss_indices(path: Path, file_names: dict) -> tuple:
+        """Loads FAISS indices from files."""
         faiss_user_index_path = path / file_names["faiss_user_index"]
         faiss_item_index_path = path / file_names["faiss_item_index"]
 

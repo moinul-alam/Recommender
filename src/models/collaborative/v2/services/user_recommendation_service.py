@@ -13,8 +13,23 @@ class UserRecommendationService:
         collaborative_dir_path: str,
         file_names: dict,
         n_recommendations: int,
-        min_similarity: float
+        min_similarity: float,
+        n_neighbors: int = 50
     ) -> List[Dict]:
+        """
+        Generate user-based recommendations based on user ratings.
+        
+        Args:
+            user_ratings: Dictionary mapping item IDs to user ratings
+            collaborative_dir_path: Directory path containing model files
+            file_names: Dictionary mapping component names to filenames
+            n_recommendations: Number of recommendations to return
+            min_similarity: Minimum similarity threshold for recommendations
+            n_neighbors: Number of neighbors to consider for recommendations (default: 50)
+            
+        Returns:
+            List of recommendation dictionaries with tmdb_id, similarity, and predicted_rating
+        """
         try:
             logger.info(f"User ratings received: {user_ratings}")
 
@@ -27,7 +42,7 @@ class UserRecommendationService:
 
             # Load model components
             components = BaseRecommendationService.load_model_components(collaborative_dir_path, file_names)
-            user_item_matrix, user_mapping, user_reverse_mapping, user_matrix, item_mapping, item_reverse_mapping, item_matrix, faiss_user_index, faiss_item_index = components
+            user_item_matrix, user_mapping, user_reverse_mapping, user_matrix, item_mapping, item_reverse_mapping, item_matrix, faiss_user_index, faiss_item_index, svd_user_model = components
 
             # Initialize recommender
             recommender = UserRecommender(
@@ -38,7 +53,9 @@ class UserRecommendationService:
                 user_item_matrix=user_item_matrix,
                 item_mapping=item_mapping,
                 item_reverse_mapping=item_reverse_mapping,
-                min_similarity=min_similarity
+                svd_user_model=svd_user_model,
+                min_similarity=min_similarity,
+                n_neighbors=n_neighbors
             )
 
             recommendations = recommender.generate_recommendations(
@@ -47,8 +64,8 @@ class UserRecommendationService:
             )
 
             logger.info(f"Generated {len(recommendations)} user-based recommendations")
-            return recommendations if recommendations else {"message": "No recommendations found"}
+            return recommendations if recommendations else []
 
         except Exception as e:
             logger.error(f"Error in generating user-based recommendations: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to generate recommendations")
+            raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")

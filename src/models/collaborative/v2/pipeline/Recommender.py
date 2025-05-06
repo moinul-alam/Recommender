@@ -37,6 +37,32 @@ class BaseRecommender:
 
 class UserRecommender(BaseRecommender):
     """Generates recommendations based on user similarity (collaborative filtering)."""
+    
+    def __init__(
+        self,
+        faiss_user_index: faiss.Index,
+        user_embedding_matrix: np.ndarray,
+        faiss_item_index: faiss.Index,
+        item_embedding_matrix: np.ndarray,
+        user_item_matrix: sparse.csr_matrix,
+        item_mapping: Dict[int, int],
+        item_reverse_mapping: Dict[int, int],
+        svd_user_model,
+        min_similarity: float,
+        n_neighbors: int = 50
+    ):
+        super().__init__(
+            faiss_index=faiss_item_index,
+            embedding_matrix=item_embedding_matrix,
+            item_mapping=item_mapping,
+            item_reverse_mapping=item_reverse_mapping,
+            min_similarity=min_similarity
+        )
+        self.faiss_user_index = faiss_user_index
+        self.user_embedding_matrix = user_embedding_matrix
+        self.user_item_matrix = user_item_matrix
+        self.svd_user_model = svd_user_model
+        self.n_neighbors = n_neighbors
 
     def generate_recommendations(self, items: Dict[int, float], n_recommendations: int) -> List[Dict]:
         """Generates movie recommendations for a user based on similar users."""
@@ -171,12 +197,18 @@ class ItemRecommender(BaseRecommender):
             # Filter out query items and items below similarity threshold
             query_items_set = set(item_indices)
             recommendations = []
-            max_distance = np.max(D)
 
             for idx, dist in zip(I[0], D[0]):
-                if idx >= 0 and idx not in query_items_set and dist >= self.min_similarity:
+                if idx >= 0 and idx not in query_items_set:
                     similar_tmdb_id = self.item_reverse_mapping.get(idx)
+                    if similar_tmdb_id is None:
+                        continue
+                        
                     similarity_score = self._convert_distance_to_similarity(dist)
+                    
+                    # Skip items below similarity threshold
+                    if similarity_score < self.min_similarity:
+                        continue
 
                     recommendations.append({
                         "tmdb_id": int(similar_tmdb_id),
