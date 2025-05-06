@@ -3,7 +3,6 @@ import faiss
 from typing import Dict, List, Optional, Tuple
 import logging
 from scipy import sparse
-from scipy.stats import pearsonr
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +49,7 @@ class UserRecommender(BaseRecommender):
         item_reverse_mapping: Dict[int, int],
         svd_user_model,
         min_similarity: float,
-        n_neighbors: int = 50,
-        use_pearson: bool = True
+        n_neighbors: int = 50
     ):
         super().__init__(
             faiss_index=faiss_item_index,
@@ -65,65 +63,6 @@ class UserRecommender(BaseRecommender):
         self.user_item_matrix = user_item_matrix
         self.svd_user_model = svd_user_model
         self.n_neighbors = n_neighbors
-        self.use_pearson = use_pearson
-        
-        # Calculate global mean and item biases during initialization
-        self._calculate_global_stats()
-        
-    def _calculate_global_stats(self):
-        """Calculate global rating mean and item biases."""
-        # Convert sparse matrix to array for calculations
-        matrix_array = self.user_item_matrix.toarray()
-        
-        # Calculate global mean of all non-zero ratings
-        non_zero_mask = matrix_array != 0
-        if np.any(non_zero_mask):
-            self.global_mean = np.sum(matrix_array[non_zero_mask]) / np.sum(non_zero_mask)
-        else:
-            self.global_mean = 0
-            
-        # Calculate item biases (difference between item mean and global mean)
-        self.item_biases = np.zeros(matrix_array.shape[1])
-        
-        for item_idx in range(matrix_array.shape[1]):
-            item_ratings = matrix_array[:, item_idx]
-            non_zero_ratings = item_ratings[item_ratings != 0]
-            
-            if len(non_zero_ratings) > 0:
-                item_mean = np.mean(non_zero_ratings)
-                self.item_biases[item_idx] = item_mean - self.global_mean
-    
-    def _calculate_pearson_similarity(self, active_user_vector, user_idx):
-        """Calculate Pearson correlation between active user and another user."""
-        # Get other user's ratings
-        other_user_ratings = self.user_item_matrix[user_idx].toarray().flatten()
-        
-        # Find items rated by both users
-        common_items = []
-        common_ratings_active = []
-        common_ratings_other = []
-        
-        for i, (active_rating, other_rating) in enumerate(zip(active_user_vector, other_user_ratings)):
-            if active_rating > 0 and other_rating > 0:  # Both users have rated this item
-                common_items.append(i)
-                common_ratings_active.append(active_rating)
-                common_ratings_other.append(other_rating)
-        
-        # If fewer than 3 items in common, return 0 similarity
-        if len(common_items) < 3:
-            return 0
-            
-        # Calculate Pearson correlation
-        try:
-            correlation, _ = pearsonr(common_ratings_active, common_ratings_other)
-            # Convert to 0-100 scale and handle NaN
-            if np.isnan(correlation):
-                return 0
-            else:
-                # Map from [-1, 1] to [0, 100]
-                return max(0, min(100, (correlation + 1) * 50))
-        except:
-            return 0  # Return 0 similarity if calculation fails
 
     def generate_recommendations(self, items: Dict[int, float], n_recommendations: int) -> List[Dict]:
         """Generates movie recommendations for a user based on similar users."""
@@ -147,11 +86,10 @@ class UserRecommender(BaseRecommender):
             ratings = [rating for _, rating in valid_indices]
             user_mean = np.mean(ratings) if ratings else 0
 
-            # Apply dual normalization (subtract user mean AND item bias)
+            # Apply mean normalization (consistent with preprocessing)
             normalized_user_vector = active_user_vector.copy()
             for idx in rated_indices:
-                # Normalize using both user mean and item bias
-                normalized_user_vector[idx] = active_user_vector[idx] - user_mean - self.item_biases[idx]
+                normalized_user_vector[idx] = active_user_vector[idx] - user_mean
 
             # Create a sparse matrix from the normalized vector
             active_user_sparse = sparse.csr_matrix(normalized_user_vector.reshape(1, -1))
@@ -160,7 +98,7 @@ class UserRecommender(BaseRecommender):
             user_vector = self.svd_user_model.transform(active_user_sparse)
 
             # Find similar users
-            search_size = min(self.n_neighbors * 2, self.user_embedding_matrix.shape[0])
+            search_size = min(self.n_neighbors, self.user_embedding_matrix.shape[0])
             D, I = self.faiss_user_index.search(user_vector, search_size)
 
             # Create a set of items already rated by the active user
@@ -171,25 +109,21 @@ class UserRecommender(BaseRecommender):
             item_similarity_sums = {}
             neighbor_count = 0
 
+            # Get max distance for similarity conversion
+            max_distance = np.max(D) if np.max(D) > 0 else 1.0
+
             for i, user_idx in enumerate(I[0]):
                 if user_idx < 0:  # Skip invalid indices
                     continue
 
-                # Calculate similarity score
-                if self.use_pearson:
-                    # Use Pearson correlation for similarity calculation
-                    user_similarity = self._calculate_pearson_similarity(active_user_vector, user_idx)
-                else:
-                    # Use FAISS distance converted to similarity
-                    user_similarity = self._convert_distance_to_similarity(D[0][i])
+                # Convert distance to similarity score
+                user_similarity = self._convert_distance_to_similarity(D[0][i])
 
                 # Only consider users above the similarity threshold
                 if user_similarity < self.min_similarity:
                     continue
 
                 neighbor_count += 1
-                if neighbor_count > self.n_neighbors:
-                    break  # Stop after we've found enough valid neighbors
 
                 # Get items rated by this similar user
                 user_ratings = self.user_item_matrix[user_idx].toarray().flatten()
@@ -204,12 +138,8 @@ class UserRecommender(BaseRecommender):
                         item_scores[item_idx] = 0
                         item_similarity_sums[item_idx] = 0
 
-                    # We need to normalize this rating by subtracting user mean and item bias
-                    # (assuming user_ratings still has user means)
-                    adjusted_rating = norm_rating - self.item_biases[item_idx]
-                    
                     # Add this user's contribution weighted by similarity
-                    item_scores[item_idx] += adjusted_rating * user_similarity
+                    item_scores[item_idx] += norm_rating * user_similarity
                     item_similarity_sums[item_idx] += user_similarity
 
             # If no neighbors above the threshold, return empty list
@@ -223,8 +153,8 @@ class UserRecommender(BaseRecommender):
                     # Normalize by sum of similarities
                     normalized_score = score / item_similarity_sums[item_idx]
 
-                    # Add back user's mean AND item bias to get back to original rating scale
-                    predicted_rating = normalized_score + user_mean + self.item_biases[item_idx]
+                    # Add back user's mean to get back to original rating scale
+                    predicted_rating = normalized_score + user_mean
 
                     # Get the original TMDB ID
                     tmdb_id = self.item_reverse_mapping.get(item_idx)
@@ -233,8 +163,7 @@ class UserRecommender(BaseRecommender):
                         recommendations.append({
                             "tmdb_id": int(tmdb_id),
                             "similarity": float(item_similarity_sums[item_idx]),
-                            "predicted_rating": float(round(predicted_rating, 2)),
-                            "confidence": min(100, float(item_similarity_sums[item_idx] / 10))  # Simple confidence metric
+                            "predicted_rating": float(round(predicted_rating, 2))
                         })
 
             # Sort by predicted rating and return top N
@@ -244,6 +173,7 @@ class UserRecommender(BaseRecommender):
         except Exception as e:
             logger.error(f"Error in generating user recommendations: {str(e)}")
             raise RuntimeError(f"Error in generating user recommendations: {str(e)}")
+
 
 class ItemRecommender(BaseRecommender):
     """Generates recommendations based on item similarity (content-based filtering)."""
