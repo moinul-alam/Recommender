@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 
 from src.config.config import BaseConfig
 
+from src.models.collaborative.v2.services.pipeline_service import PipelineService
 from src.models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 from src.models.collaborative.v2.services.indexing_service import IndexingService
@@ -12,12 +13,10 @@ from src.models.collaborative.v2.services.user_recommendation_service import Use
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.model_evaluation_service import ModelEvaluationService
 
-# from src.models.collaborative.v2.services.pipeline_service import PipelineService
-
-
 # from src.models.collaborative.v2.services.svd_service import SVDService
   
 # from src.models.collaborative.v2.services.recommendation_service import RecommendationService
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -293,50 +292,46 @@ def evaluate_model(
     
     
     
-# @collaborative_router_v2.post("/execute-pipeline")
-# def execute_full_pipeline(
-#     collaborative_dir_path: str = Query(
-#         default=str(collaborative_dir_path),
-#         description="Path to the dataset file"
-#     ),
-#     dataset_name: str = Query(
-#         default=str("1_movielens_dataset.csv"),
-#         description="Name of the dataset file"
-#     ),
-#     sparse_user_threshold: int = Query(5, description="Minimum ratings per user"),
-#     sparse_item_threshold: int = Query(1, description="Minimum ratings per item"),
-#     train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
-#     segment_size: int = Query(10000, description="Chunk size for processing"),
-#     n_neighbors: Optional[int] = Query(
-#         default=100, 
-#         description="Number of nearest neighbors to consider"
-#     ),
-#     similarity_metric: str = Query(
-#         default='cosine', 
-#         description="Similarity calculation method (euclidean/cosine)"
-#     ),
-#     batch_size: int = Query(
-#         default=10000, 
-#         description="Batch size for similarity matrix computation"
-#     ),
-#     min_similarity: float = Query(
-#         default=0.1, 
-#         description="Minimum similarity threshold"
-#     )
-# ):
-#     try:
-#         result = PipelineService.execute_full_pipeline(
-#             collaborative_dir_path=collaborative_dir_path,
-#             dataset_name=dataset_name,
-#             sparse_user_threshold=sparse_user_threshold,
-#             sparse_item_threshold=sparse_item_threshold,
-#             train_test_split_ratio=train_test_split_ratio,
-#             segment_size=segment_size,
-#             n_neighbors=n_neighbors,
-#             similarity_metric=similarity_metric,
-#             batch_size=batch_size,
-#             min_similarity=min_similarity
-#         )
-#         return result
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")
+@collaborative_router_v2.post("/execute-pipeline")
+def execute_full_pipeline(
+    collaborative_dir_path: str = Query(
+        default=str(collaborative_dir_path),
+        description="Path to the dataset file"
+    ),
+    sparse_user_threshold: int = Query(10, description="Minimum ratings per user"),
+    sparse_item_threshold: int = Query(10, description="Minimum ratings per item"),
+    train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
+    segment_size: int = Query(10000, description="Chunk size for processing"),
+    n_components_item: int = Query(
+        default=300, 
+        description="Number of components for item SVD"
+    ),
+    n_components_user: int = Query(
+        default=300, 
+        description="Number of components for user SVD"
+    ),
+    similarity_metric: str = Query(
+        default='cosine', 
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
+    batch_size: int = Query(
+        default=10000, 
+        description="Batch size for similarity matrix computation"
+    )
+):
+    try:
+        result = PipelineService.execute_full_pipeline(
+            collaborative_dir_path,
+            file_names,
+            sparse_user_threshold,
+            sparse_item_threshold,
+            train_test_split_ratio,
+            segment_size,
+            n_components_item,
+            n_components_user,
+            similarity_metric,
+            batch_size
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")

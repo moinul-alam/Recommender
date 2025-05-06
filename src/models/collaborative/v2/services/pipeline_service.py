@@ -1,9 +1,10 @@
-import os
 import logging
-import pathlib
+from pathlib import Path
 from fastapi import HTTPException
-from models.collaborative.v2.services.data_preprocessing_service import PreprocessingService
+from src.models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
+from src.models.collaborative.v2.services.indexing_service import IndexingService
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -12,49 +13,54 @@ class PipelineService:
     @staticmethod
     def execute_full_pipeline(
         collaborative_dir_path: str,
-        dataset_name: str,
-        sparse_user_threshold: int = 5,
-        sparse_item_threshold: int = 1,
-        split_percent: float = 0.8,
-        chunk_size: int = 10000,
-        n_neighbors: int = 50,
-        similarity_metric: str = "L2",
-        batch_size: int = 1000,
-        min_similarity: float = 0.1
+        file_names: dict,
+        sparse_user_threshold: int = 10,
+        sparse_item_threshold: int = 10,
+        train_test_split_ratio: float = 0.8,
+        segment_size: int = 10000,
+        n_components_item: int = 300,
+        n_components_user: int = 300,
+        similarity_metric: str = "cosine",
+        batch_size: int = 10000
     ):
         try:
-            collaborative_dir_path = pathlib.Path(collaborative_dir_path)
-            
-            if not collaborative_dir_path.exists():
-                logger.error(f"Collaborative directory not found: {collaborative_dir_path}")
-                raise HTTPException(status_code=404, detail=f"Collaborative directory not found: {collaborative_dir_path}")       
-                    
-
-            preprocessing_result = PreprocessingService.process_data(
-                collaborative_dir_path=collaborative_dir_path,
-                dataset_name=dataset_name,
-                sparse_user_threshold=sparse_user_threshold,
-                sparse_item_threshold=sparse_item_threshold,
-                split_percent=split_percent,
-                chunk_size=chunk_size
+            # Data Preprocessing
+            preprocessing_result = DataPreprocessingService.process_data(
+                collaborative_dir_path,
+                file_names,
+                sparse_user_threshold,
+                sparse_item_threshold,
+                train_test_split_ratio,
+                segment_size
             )
-
+            
             if not preprocessing_result:
                 return {"status": "Preprocessing failed"}
-
-            training_result = FeatureExtractionService.extract_features(
-                collaborative_dir_path=collaborative_dir_path,
-                n_neighbors=n_neighbors,
-                similarity_metric=similarity_metric,
-                batch_size=batch_size,
-                min_similarity=min_similarity
+            
+            # Feature Extraction
+            feature_extraction_result = FeatureExtractionService.extract_features(
+                collaborative_dir_path,
+                file_names,
+                n_components_item,
+                n_components_user,
+                batch_size
             )
-
-            if not training_result:
-                return {"status": "Model training failed"}
-
-            return {"status": "Model Training Successful"}
-
+            
+            if not feature_extraction_result:
+                return {"status": "Feature extraction failed"}
+            
+            # Index Creation
+            indexing_result = IndexingService.create_index(
+                collaborative_dir_path,
+                file_names,
+                similarity_metric,
+                batch_size
+            )
+            
+            if not indexing_result:
+                return {"status": "Index creation failed"}
+            
+            return {"status": "Pipeline executed successfully"}
         except Exception as e:
             logger.error(f"Pipeline execution failed: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Pipeline execution error: {str(e)}")

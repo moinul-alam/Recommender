@@ -13,8 +13,8 @@ class FeatureExtractionService:
     def extract_features(
         collaborative_dir_path: str,
         file_names: dict,
-        n_components_user: int = 200,
-        n_components_item: int = 200,
+        n_components_user: int = 300,
+        n_components_item: int = 300,
         batch_size: int = 50000
     ) -> PipelineResponse:
         logger = logging.getLogger(__name__)

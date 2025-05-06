@@ -14,8 +14,9 @@ router = APIRouter()
 
 # router.include_router(content_based_router_v4, prefix="/content-based/v4", tags=["Content-Based Recommender (Version 4: TF-IDF, SVD, FAISS)"])
 # router.include_router(content_based_router_v3, prefix="/content-based/v3", tags=["Content-Based Recommender (Version 3: Sentence Transformers, FAISS)"])
-router.include_router(content_based_router_v2, prefix="/content-based/v2", tags=["Content-Based Recommender (Version 2: TF-IDF, SVD, PCA, FAISS)"])
 router.include_router(collaborative_router_v2, prefix="/collaborative/v2", tags=["Collaborative Recommender (Version 2: SVD, FAISS)"])
+
+router.include_router(content_based_router_v2, prefix="/content-based/v2", tags=["Content-Based Recommender (Version 2: TF-IDF, SVD, PCA, FAISS)"])
 # router.include_router(collaborative_router_v3, prefix="/collaborative/v3", tags=["Collaborative Recommender (Version 3: Matrix Factorization)"])
 # router.include_router(collaborative_router_v1, prefix="/collaborative/v1", tags=["Collaborative Recommender (Version 1)"])
 # router.include_router(content_based_router_v1, prefix="/content-based/v1", tags=["Content-Based Recommender (Version 1)"])
