@@ -8,10 +8,12 @@ from src.models.collaborative.v2.services.pipeline_service import PipelineServic
 from src.models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 from src.models.collaborative.v2.services.indexing_service import IndexingService
+from src.models.collaborative.v2.services.collaborative_recommendation_service import CollaborativeRecommendationService
 
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.evaluation_service import EvaluationService
+from src.schemas.content_based_schema import RecommendationRequest
 
 
 logger = logging.getLogger(__name__)
@@ -21,31 +23,6 @@ version = 2
 config = BaseConfig()
 collaborative_dir_path  = config.COLLABORATIVE_PATH / f"v{version}"
 collaborative_router_v2 = APIRouter()
-
-# # Define constants for dataset/file/model names
-# file_names = {
-#     "dataset_name": "1_movielens_dataset.csv",
-#     "train_set": "2_train_set.pkl",
-#     "test_set": "2_test_set.pkl",
-#     "user_mapping": "2_user_mapping.pkl",
-#     "user_reverse_mapping": "2_user_reverse_mapping.pkl",
-#     "item_mapping": "2_item_mapping.pkl",
-#     "item_reverse_mapping": "2_item_reverse_mapping.pkl",
-#     "user_item_mappings": "2_user_item_mappings.pkl",
-#     "user_item_matrix": "2_user_item_matrix.pkl",
-#     "user_matrix": "3_user_matrix.pkl",
-#     "item_matrix": "3_item_matrix.pkl",
-#     "user_means": "3_user_means.pkl",
-#     "item_means": "3_item_means.pkl",
-#     "user_item_means": "3_user_item_means.pkl",
-#     "svd_user_model": "3_svd_user_model.pkl",
-#     "svd_item_model": "3_svd_item_model.pkl",
-#     "svd_components": "3_svd_components.pkl",
-#     "model_info": "3_model_info.pkl",
-#     "model_components": "3_model_components.pkl",
-#     "faiss_user_index": "4_user_index.faiss",
-#     "faiss_item_index": "4_item_index.faiss",
-# }
 
 """
 Data Preprocessing
@@ -170,6 +147,39 @@ def create_index(
     except Exception as e:
         logger.error(f"Unexpected error during Index Creation: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during Index Creation.")
+
+"""
+Recommendation Endpoints
+"""
+@collaborative_router_v2.post("/recommendations")
+async def get_recommendations(
+    recommendation_request: RecommendationRequest,
+    n_recommendations: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
+    similarity_metric: str = Query(
+        default='cosine',
+        description="Similarity calculation method (euclidean/cosine)"
+    ),
+    min_similarity: float = Query(
+        default=0,
+        ge=0.0,
+        le=1.0
+    )
+):
+    logger.info(f"Received recommendation request: {recommendation_request}")
+    
+    try:
+        return await CollaborativeRecommendationService.get_recommendations(
+            recommendation_request,
+            collaborative_dir_path,
+            similarity_metric,
+            min_similarity
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")
 
 """
 Item based Recommendation Endpoints

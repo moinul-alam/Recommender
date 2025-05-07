@@ -34,14 +34,13 @@ class RecommendationRequest(BaseModel):
     
 class Recommendation(BaseModel):
     tmdb_id: int
-    item_title: str
+    item_title: Optional[str] = None
+    predicted_rating: Optional[float] = None
     similarity: float
 
 class RecommendationResponse(BaseModel):
     status: str
     recommendations: List[Recommendation]
-
-
 
 
 class EvaluationRequest(BaseModel):
