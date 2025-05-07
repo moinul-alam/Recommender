@@ -4,6 +4,7 @@ import numpy as np
 from typing import Dict, Any, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
+from src.models.common.file_config import file_names
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ class Evaluator:
     @staticmethod
     def evaluate_prediction(
         collaborative_dir_path: str,
-        file_names: dict,
         train_data: pd.DataFrame,
         test_data: pd.DataFrame,
         n_recommendations: int = 10,

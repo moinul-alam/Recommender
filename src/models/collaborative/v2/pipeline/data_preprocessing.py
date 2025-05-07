@@ -1,19 +1,17 @@
 import logging
 from typing import Tuple
 import pandas as pd
-import numpy as np
 from scipy import sparse
 import gc
 
-# Configure global logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 class DataPreprocessing:
     def __init__(
         self, 
-        sparse_user_threshold: int = 5, 
-        sparse_item_threshold: int = 5,
+        sparse_user_threshold: int = 10, 
+        sparse_item_threshold: int = 10,
         split_percent: float = 0.8,
         segment_size: int = 10000
     ):
@@ -93,15 +91,6 @@ class DataPreprocessing:
         
         del rows, cols, data
         gc.collect()
-
-        user_means = np.array(user_item_matrix.sum(axis=1)).flatten() / (
-            np.maximum(user_item_matrix.getnnz(axis=1), 1)
-        )
-
-        for i in range(n_users):
-            user_ratings = user_item_matrix[i].data
-            if len(user_ratings) > 0:
-                user_item_matrix[i].data = user_ratings - user_means[i]
 
         logger.info(
             f"Created sparse matrix: {user_item_matrix.shape}, "

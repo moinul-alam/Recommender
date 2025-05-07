@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 from src.models.collaborative.v2.pipeline.evaluator import Evaluator
+from src.models.common.file_config import file_names
 
 from src.models.common.DataLoader import load_data
 
@@ -17,7 +18,6 @@ class EvaluationService:
     @staticmethod
     def evaluate_recommender(
         collaborative_dir_path: str,
-        file_names: dict,
         sample_size: int = 100,
         n_recommendations: int = 10,
         min_similarity: float = 0.1

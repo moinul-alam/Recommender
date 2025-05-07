@@ -3,6 +3,7 @@ import logging
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.recommender import UserRecommender
 from src.models.collaborative.v2.services.base_recommendation_service import BaseRecommendationService
+from src.models.common.file_config import file_names
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ class UserRecommendationService:
     def get_user_recommendations(
         user_ratings: Dict[str, float],
         collaborative_dir_path: str,
-        file_names: dict,
         n_recommendations: int,
         similarity_metric: str,
         min_similarity: float,

@@ -13,10 +13,6 @@ from src.models.collaborative.v2.services.user_recommendation_service import Use
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.evaluation_service import EvaluationService
 
-# from src.models.collaborative.v2.services.svd_service import SVDService
-  
-# from src.models.collaborative.v2.services.recommendation_service import RecommendationService
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -26,24 +22,30 @@ config = BaseConfig()
 collaborative_dir_path  = config.COLLABORATIVE_PATH / f"v{version}"
 collaborative_router_v2 = APIRouter()
 
-# Define constants for dataset/file/model names
-file_names = {
-    "dataset_name": "1_movielens_dataset.csv",
-    "train_set": "2_train_set.pkl",
-    "test_set": "2_test_set.pkl",
-    "user_mapping": "2_user_mapping.pkl",
-    "user_reverse_mapping": "2_user_reverse_mapping.pkl",
-    "item_mapping": "2_item_mapping.pkl",
-    "item_reverse_mapping": "2_item_reverse_mapping.pkl",
-    "user_item_matrix": "2_user_item_matrix.pkl",
-    "user_matrix": "3_user_matrix.pkl",
-    "item_matrix": "3_item_matrix.pkl",
-    "svd_user_model": "3_svd_user_model.pkl",
-    "svd_item_model": "3_svd_item_model.pkl",
-    "model_info": "3_model_info.pkl",
-    "faiss_user_index": "4_user_index.faiss",
-    "faiss_item_index": "4_item_index.faiss",
-}
+# # Define constants for dataset/file/model names
+# file_names = {
+#     "dataset_name": "1_movielens_dataset.csv",
+#     "train_set": "2_train_set.pkl",
+#     "test_set": "2_test_set.pkl",
+#     "user_mapping": "2_user_mapping.pkl",
+#     "user_reverse_mapping": "2_user_reverse_mapping.pkl",
+#     "item_mapping": "2_item_mapping.pkl",
+#     "item_reverse_mapping": "2_item_reverse_mapping.pkl",
+#     "user_item_mappings": "2_user_item_mappings.pkl",
+#     "user_item_matrix": "2_user_item_matrix.pkl",
+#     "user_matrix": "3_user_matrix.pkl",
+#     "item_matrix": "3_item_matrix.pkl",
+#     "user_means": "3_user_means.pkl",
+#     "item_means": "3_item_means.pkl",
+#     "user_item_means": "3_user_item_means.pkl",
+#     "svd_user_model": "3_svd_user_model.pkl",
+#     "svd_item_model": "3_svd_item_model.pkl",
+#     "svd_components": "3_svd_components.pkl",
+#     "model_info": "3_model_info.pkl",
+#     "model_components": "3_model_components.pkl",
+#     "faiss_user_index": "4_user_index.faiss",
+#     "faiss_item_index": "4_item_index.faiss",
+# }
 
 """
 Data Preprocessing
@@ -66,7 +68,6 @@ async def process_data(
     try:
         result = DataPreprocessingService.process_data(
             collaborative_dir_path,
-            file_names,
             sparse_user_threshold,
             sparse_item_threshold,
             train_test_split_ratio,
@@ -117,7 +118,6 @@ def extract_features(
     try:
         result = FeatureExtractionService.extract_features(
             collaborative_dir_path,
-            file_names,
             n_components_item,
             n_components_user,
             batch_size
@@ -156,7 +156,6 @@ def create_index(
     try:
         result = IndexingService.create_index(
             collaborative_dir_path,
-            file_names,
             similarity_metric,
             batch_size
         )
@@ -203,7 +202,6 @@ def get_item_recommendations(
         recommendations = ItemRecommendationService.get_item_recommendations(
             items,
             collaborative_dir_path,
-            file_names,
             n_recommendations,
             min_similarity
         )
@@ -252,7 +250,6 @@ def get_user_recommendations(
         recommendations = UserRecommendationService.get_user_recommendations(
             user_ratings,
             collaborative_dir_path,
-            file_names,
             n_recommendations,
             similarity_metric,
             min_similarity
@@ -293,7 +290,6 @@ def evaluate(
     try:
         results = EvaluationService.evaluate_recommender(
             collaborative_dir_path,
-            file_names,
             sample_size,
             n_recommendations,
             min_similarity 
@@ -340,7 +336,6 @@ def execute_full_pipeline(
     try:
         result = PipelineService.execute_full_pipeline(
             collaborative_dir_path,
-            file_names,
             sparse_user_threshold,
             sparse_item_threshold,
             train_test_split_ratio,

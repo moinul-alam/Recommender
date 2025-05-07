@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.index_creation import IndexCreation
+from src.models.common.file_config import file_names
 from src.models.common.DataLoader import load_data
 from src.models.common.DataSaver import save_data, save_objects
 
@@ -13,7 +14,6 @@ class IndexingService:
     @staticmethod
     def create_index(
         collaborative_dir_path: str,
-        file_names: Dict[str, str],
         similarity_metric: str = "cosine",
         batch_size: int = 20000
     ) -> Optional[PipelineResponse]:
@@ -83,12 +83,10 @@ class IndexingService:
                     detail=f"Failed to load item matrix: {item_matrix_path}"
                 )
             
-            # Validate similarity metric
             if similarity_metric not in ["cosine", "inner_product"]:
                 logger.warning(f"Unrecognized similarity metric: {similarity_metric}, defaulting to cosine")
                 similarity_metric = "cosine"
             
-            # Initialize indexer and create indexes
             indexer = IndexCreation(
                 similarity_metric=similarity_metric,
                 batch_size=batch_size
@@ -103,6 +101,7 @@ class IndexingService:
                 index_type="user",
                 index_path=str(user_index_path)
             )
+            logger.info(f"✅ Index created: {user_index.__class__.__name__} | Dimensionality: {user_index.d} | Total vectors: {user_index.ntotal}")
             
             logger.info(f"Creating item index at {item_index_path}")
             item_index = indexer.create_faiss_index(
@@ -110,8 +109,8 @@ class IndexingService:
                 index_type="item",
                 index_path=str(item_index_path)
             )
-            
-            logger.info("Index creation completed successfully")
+            logger.info(f" ✅ Index created: {item_index.__class__.__name__} | Dimensionality: {item_index.d} | Total vectors: {item_index.ntotal}")
+                        
             return PipelineResponse(
                 status="success",
                 message="FAISS index creation completed successfully.",

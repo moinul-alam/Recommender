@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from typing import Dict, Tuple
 from scipy import sparse
+from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,43 @@ class FeatureExtraction:
         self.n_components_user = n_components_user
         self.batch_size = batch_size
         self.random_state = 42
+    
+    @staticmethod
+    def _mean_center(matrix: csr_matrix, axis: str) -> Tuple[csr_matrix, np.ndarray]:
+        
+        logger.info(f"Mean centering the matrix by {axis}s...")
 
-    def extract(self, user_item_matrix: sparse.csr_matrix) -> Tuple[Dict]:
+        matrix = matrix.copy()
+
+        if axis == "user":
+            # Mean across rows (users)
+            means = np.array(matrix.sum(axis=1)).flatten() / (
+                np.maximum(matrix.getnnz(axis=1), 1)
+            )
+            for i in range(matrix.shape[0]):
+                if matrix[i].nnz > 0:
+                    matrix[i].data -= means[i]
+
+        elif axis == "item":
+            # Mean across columns (items)
+            matrix = matrix.tocsc()  # Switch to efficient column ops
+            means = np.array(matrix.sum(axis=0)).flatten() / (
+                np.maximum(matrix.getnnz(axis=0), 1)
+            )
+            for j in range(matrix.shape[1]):
+                if matrix[:, j].nnz > 0:
+                    matrix.data[matrix.indptr[j]:matrix.indptr[j+1]] -= means[j]
+            matrix = matrix.tocsr()  # Convert back to row format
+
+        else:
+            raise ValueError("Axis must be either 'user' or 'item'")
+
+        logger.info("Mean centering completed.")
+
+        return matrix, means
+
+
+    def extract(self, user_item_matrix: sparse.csr_matrix) -> Dict:
         if user_item_matrix.nnz == 0:
             raise ValueError("Input matrix is empty (no non-zero elements)")
 
@@ -40,14 +76,16 @@ class FeatureExtraction:
 
         # **User-User Matrix Training**
         logger.info(f"Reducing user dimensions to {self.n_components_user} using Truncated SVD")
+        user_centered_matrix, user_means = self._mean_center(matrix=user_item_matrix, axis="user")
         svd_user = TruncatedSVD(n_components=self.n_components_user, random_state=self.random_state)
-        user_matrix = svd_user.fit_transform(user_item_matrix)
+        user_matrix = svd_user.fit_transform(user_centered_matrix)
 
         # **Item-Item Matrix Training**
         item_user_matrix = user_item_matrix.T.tocsr()
         logger.info(f"Reducing item dimensions to {self.n_components_item} using Truncated SVD")
+        item_centered_matrix, item_means = self._mean_center(matrix=item_user_matrix, axis="item")
         svd_item = TruncatedSVD(n_components=self.n_components_item, random_state=self.random_state)
-        item_matrix = svd_item.fit_transform(item_user_matrix)
+        item_matrix = svd_item.fit_transform(item_centered_matrix)
 
         # Identify zero vectors in item_matrix
         zero_vector_indices = np.where(np.all(item_matrix == 0, axis=1))[0]
@@ -78,7 +116,9 @@ class FeatureExtraction:
 
         return {
             'user_matrix': user_matrix,
+            'user_means': user_means,
             'item_matrix': item_matrix,
+            'item_means': item_means,
             'svd_user_model': svd_user,
             'svd_item_model': svd_item,
             'model_info': model_info

@@ -5,7 +5,6 @@ from src.models.collaborative.v2.services.data_preprocessing_service import Data
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 from src.models.collaborative.v2.services.indexing_service import IndexingService
 
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -13,7 +12,6 @@ class PipelineService:
     @staticmethod
     def execute_full_pipeline(
         collaborative_dir_path: str,
-        file_names: dict,
         sparse_user_threshold: int = 10,
         sparse_item_threshold: int = 10,
         train_test_split_ratio: float = 0.8,
@@ -27,7 +25,6 @@ class PipelineService:
             # Data Preprocessing
             preprocessing_result = DataPreprocessingService.process_data(
                 collaborative_dir_path,
-                file_names,
                 sparse_user_threshold,
                 sparse_item_threshold,
                 train_test_split_ratio,
@@ -40,7 +37,6 @@ class PipelineService:
             # Feature Extraction
             feature_extraction_result = FeatureExtractionService.extract_features(
                 collaborative_dir_path,
-                file_names,
                 n_components_item,
                 n_components_user,
                 batch_size
@@ -52,7 +48,6 @@ class PipelineService:
             # Index Creation
             indexing_result = IndexingService.create_index(
                 collaborative_dir_path,
-                file_names,
                 similarity_metric,
                 batch_size
             )

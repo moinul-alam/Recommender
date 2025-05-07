@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from fastapi import HTTPException
 from src.models.common.DataLoader import load_data
+from src.models.common.file_config import file_names
 from src.models.common.DataSaver import save_data, save_objects
 from src.models.collaborative.v2.pipeline.data_preprocessing import DataPreprocessing
 from src.schemas.content_based_schema import PipelineResponse
@@ -13,7 +14,6 @@ class DataPreprocessingService:
     @staticmethod
     def process_data(
         collaborative_dir_path: str,
-        file_names: dict,
         sparse_user_threshold: int = 5,
         sparse_item_threshold: int = 5,
         split_percent: float = 0.8,
@@ -70,14 +70,18 @@ class DataPreprocessingService:
                 logger.info(f"Sample item mappings (first 5): {list(item_mapping.items())[:5]}")
                 logger.info(f"Sample item reverse mappings (first 5): {list(item_reverse_mapping.items())[:5]}")
             
+            user_item_mappings = {
+                "user_mapping": user_mapping,
+                "user_reverse_mapping": user_reverse_mapping,
+                "item_mapping": item_mapping,
+                "item_reverse_mapping": item_reverse_mapping,
+            }
+            
             files_to_save = {
                 file_names["train_set"]: train,
                 file_names["test_set"]: test,
-                file_names["user_mapping"]: user_mapping,
-                file_names["user_reverse_mapping"]: user_reverse_mapping,
-                file_names["item_mapping"]: item_mapping,
-                file_names["item_reverse_mapping"]: item_reverse_mapping,
-                file_names["user_item_matrix"]: user_item_matrix
+                file_names["user_item_matrix"]: user_item_matrix,
+                file_names["user_item_mappings"]: user_item_mappings
             }
                 
             save_objects(
@@ -86,6 +90,29 @@ class DataPreprocessingService:
                 compress=3
             )
             
+            # Test the saved user-item matrix
+            logger.info("Testing the saved user-item matrix...")
+            test_user_idx = 0
+            test_item_indices = user_item_matrix[test_user_idx].indices
+            ratings = user_item_matrix[test_user_idx].data
+
+            num_items_rated = len(test_item_indices)
+            logger.info(f"User {test_user_idx} has rated {num_items_rated} items.")
+
+            max_items_to_show = 5
+            if num_items_rated > max_items_to_show:
+                logger.info(f"Showing ratings for the first {max_items_to_show} items:")
+            else:
+                logger.info(f"Showing ratings for all {num_items_rated} items:")
+
+            for item, rating in zip(test_item_indices[:max_items_to_show], ratings[:max_items_to_show]):
+                logger.info(f"User {test_user_idx} -> Item {item} with rating {rating}")
+                
+            
+            # Testing user item mappings
+            logger.info(f"Testing user item mappings {user_item_mappings.keys()}")
+            logger.info(f"Sample user_mapping: {list(user_item_mappings['user_mapping'].items())[:5]}")
+        
             logger.info(f"Data saved successfully in {collaborative_dir_path}")
             
             return PipelineResponse(

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.feature_extraction import FeatureExtraction
+from src.models.common.file_config import file_names
 from src.models.common.DataLoader import load_data
 from src.models.common.DataSaver import save_data, save_objects
 
@@ -12,7 +13,6 @@ class FeatureExtractionService:
     @staticmethod
     def extract_features(
         collaborative_dir_path: str,
-        file_names: dict,
         n_components_user: int = 300,
         n_components_item: int = 300,
         batch_size: int = 50000
@@ -49,13 +49,23 @@ class FeatureExtractionService:
 
             # Train model
             model_results = extractor.extract(user_item_matrix)
+            
+            user_item_means = {
+                file_names["user_means"]: model_results['user_means'],
+                file_names["item_means"]: model_results['item_means'],
+            }
+            
+            svd_components = {
+                file_names["svd_user_model"]: model_results['svd_user_model'],
+                file_names["svd_item_model"]: model_results['svd_item_model'],
+            }
 
             # Define output paths
             files_to_save = {
                 file_names["user_matrix"]: model_results['user_matrix'],
                 file_names["item_matrix"]: model_results['item_matrix'],
-                file_names["svd_user_model"]: model_results['svd_user_model'],
-                file_names["svd_item_model"]: model_results['svd_item_model'],
+                file_names["user_item_means"]: user_item_means,
+                file_names["svd_components"]: svd_components,
                 file_names["model_info"]: model_results['model_info']
             }
             
