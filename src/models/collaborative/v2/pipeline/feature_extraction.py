@@ -76,16 +76,16 @@ class FeatureExtraction:
 
         # **User-User Matrix Training**
         logger.info(f"Reducing user dimensions to {self.n_components_user} using Truncated SVD")
-        user_centered_matrix, user_means = self._mean_center(matrix=user_item_matrix, axis="user")
+        user_item_matrix, user_means = self._mean_center(matrix=user_item_matrix, axis="user")
         svd_user = TruncatedSVD(n_components=self.n_components_user, random_state=self.random_state)
-        user_matrix = svd_user.fit_transform(user_centered_matrix)
+        user_matrix = svd_user.fit_transform(user_item_matrix)
 
         # **Item-Item Matrix Training**
         item_user_matrix = user_item_matrix.T.tocsr()
         logger.info(f"Reducing item dimensions to {self.n_components_item} using Truncated SVD")
-        item_centered_matrix, item_means = self._mean_center(matrix=item_user_matrix, axis="item")
+        item_user_matrix, item_means = self._mean_center(matrix=item_user_matrix, axis="item")
         svd_item = TruncatedSVD(n_components=self.n_components_item, random_state=self.random_state)
-        item_matrix = svd_item.fit_transform(item_centered_matrix)
+        item_matrix = svd_item.fit_transform(item_user_matrix)
 
         # Identify zero vectors in item_matrix
         zero_vector_indices = np.where(np.all(item_matrix == 0, axis=1))[0]
@@ -100,7 +100,6 @@ class FeatureExtraction:
             
             # Fix zero vectors with a small random noise to avoid normalization issues
             for idx in zero_vector_indices:
-                # Generate small random values (but deterministic based on index)
                 np.random.seed(self.random_state + idx)
                 item_matrix[idx] = np.random.uniform(1e-6, 1e-5, size=item_matrix.shape[1])
                 logger.info(f"Replaced zero vector for item {idx} with small random values")

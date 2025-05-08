@@ -43,6 +43,7 @@ class RecommendationResponse(BaseModel):
     recommendations: List[Recommendation]
 
 
+
 class EvaluationRequest(BaseModel):
     index_path: str
     feature_matrix_path: str

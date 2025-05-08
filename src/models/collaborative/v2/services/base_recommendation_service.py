@@ -3,20 +3,20 @@ import logging
 from fastapi import HTTPException
 from pathlib import Path
 from src.models.common.DataLoader import load_multiple
+from src.models.common.file_config import file_names
 
 logger = logging.getLogger(__name__)
 
 class BaseRecommendationService:
     REQUIRED_KEYS = [
-        "user_item_matrix", "user_mapping", "user_reverse_mapping",
-        "item_mapping", "item_reverse_mapping",
+        "user_item_matrix", "user_item_mappings",
         "user_matrix", "item_matrix",
         "faiss_user_index", "faiss_item_index",
-        "svd_user_model"
+        "svd_components",
     ]
 
     @staticmethod
-    def load_model_components(collaborative_dir_path: str, file_names: dict) -> tuple:
+    def load_model_components(collaborative_dir_path: str) -> tuple:
         """
         Loads all required model components and FAISS indices.
         
@@ -33,47 +33,26 @@ class BaseRecommendationService:
         collaborative_dir_path = Path(collaborative_dir_path)
 
         # Load standard model components
-        components = BaseRecommendationService._load_data_components(
-            collaborative_dir_path, file_names
-        )
-
-        (
-            user_item_matrix,
-            user_mapping,
-            user_reverse_mapping,
-            item_mapping,
-            item_reverse_mapping,
-            user_matrix,
-            item_matrix,
-            svd_user_model
-        ) = (
-            components["user_item_matrix"],
-            components["user_mapping"],
-            components["user_reverse_mapping"],
-            components["item_mapping"],
-            components["item_reverse_mapping"],
-            components["user_matrix"],
-            components["item_matrix"],
-            components["svd_user_model"]
+        components = BaseRecommendationService._load_required_components(
+            path = collaborative_dir_path, 
+            file_names = file_names
         )
 
         # Load FAISS indices
         faiss_user_index, faiss_item_index = BaseRecommendationService._load_faiss_indices(
-            collaborative_dir_path, file_names
+            path = collaborative_dir_path, 
+            file_names = file_names
         )
 
-        return (
-            user_item_matrix,
-            user_mapping,
-            user_reverse_mapping,
-            user_matrix,
-            item_mapping,
-            item_reverse_mapping,
-            item_matrix,
-            faiss_user_index,
-            faiss_item_index,
-            svd_user_model
-        )
+        return {
+            "user_item_matrix": components["user_item_matrix"],
+            "user_item_mappings": components["user_item_mappings"],
+            "user_matrix": components["user_matrix"],
+            "item_matrix": components["item_matrix"],
+            "faiss_user_index": faiss_user_index,
+            "faiss_item_index": faiss_item_index,
+            "svd_components": components["svd_components"]
+        }
 
     @staticmethod
     def _validate_file_keys(file_names: dict):
@@ -86,17 +65,14 @@ class BaseRecommendationService:
             raise HTTPException(status_code=400, detail=f"Missing file names: {missing_keys}")
 
     @staticmethod
-    def _load_data_components(path: Path, file_names: dict) -> dict:
+    def _load_required_components(path: Path, file_names: dict) -> dict:
         """Loads model data components from files."""
         files_to_load = {
             "user_item_matrix": file_names["user_item_matrix"],
-            "user_mapping": file_names["user_mapping"],
-            "user_reverse_mapping": file_names["user_reverse_mapping"],
-            "item_mapping": file_names["item_mapping"],
-            "item_reverse_mapping": file_names["item_reverse_mapping"],
+            "user_item_mappings": file_names["user_item_mappings"],
             "user_matrix": file_names["user_matrix"],
             "item_matrix": file_names["item_matrix"],
-            "svd_user_model": file_names["svd_user_model"]
+            "svd_components": file_names["svd_components"]
         }
 
         try:

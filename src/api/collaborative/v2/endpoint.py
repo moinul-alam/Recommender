@@ -13,7 +13,7 @@ from src.models.collaborative.v2.services.collaborative_recommendation_service i
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.evaluation_service import EvaluationService
-from src.schemas.content_based_schema import RecommendationRequest
+from src.schemas.recommender_schema import RecommendationRequest
 
 
 logger = logging.getLogger(__name__)
@@ -186,18 +186,14 @@ Item based Recommendation Endpoints
 """
 @collaborative_router_v2.post("/recommendations/item-based")
 def get_item_recommendations(
-    items: List[int] = Body(
-        ..., 
-        description="List of TMDB IDs for item-based recommendation"
-    ),
+    recommendation_request: RecommendationRequest,
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to preprocessed dataset"
     ),
-    n_recommendations: int = Query(
-        default=20,
-        ge=1,
-        le=100
+    similarity_metric: str = Query(
+        default='cosine',
+        description="Similarity calculation method (euclidean/cosine)"
     ),
     min_similarity: float = Query(
         default=0.0,
@@ -205,14 +201,13 @@ def get_item_recommendations(
         le=1.0
     )
 ):
-    """Generate item-based recommendations using only TMDB IDs."""
     try:
-        logger.info(f'Generating item-based recommendations for {len(items)} items')
-
+        logger.info(f"Received item-based recommendation request...")
+        
         recommendations = ItemRecommendationService.get_item_recommendations(
-            items,
+            recommendation_request,
             collaborative_dir_path,
-            n_recommendations,
+            similarity_metric,
             min_similarity
         )
 
