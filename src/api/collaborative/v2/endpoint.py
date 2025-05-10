@@ -33,10 +33,6 @@ async def process_data(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
     ),
-    sparse_user_threshold: int = Query(10, description="Minimum ratings per user"),
-    sparse_item_threshold: int = Query(10, description="Minimum ratings per item"),
-    train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
-    segment_size: int = Query(10000, description="Segment size for processing")
 ):
     logger.info(
         f"Received data preprocessing request in the route Collaborative v{version} "
@@ -44,11 +40,7 @@ async def process_data(
 
     try:
         result = DataPreprocessingService.process_data(
-            collaborative_dir_path,
-            sparse_user_threshold,
-            sparse_item_threshold,
-            train_test_split_ratio,
-            segment_size
+            directory_path = collaborative_dir_path
         )
         
         if result is None:

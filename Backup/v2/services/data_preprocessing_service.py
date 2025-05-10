@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from src.models.common.DataLoader import load_data
 from src.models.common.file_config import file_names
-from src.models.common.DataSaver import save_objects
+from src.models.common.DataSaver import save_data, save_objects
 from src.models.collaborative.v2.pipeline.data_preprocessing import DataPreprocessing
 from src.schemas.content_based_schema import PipelineResponse
 
@@ -14,17 +14,14 @@ class DataPreprocessingService:
     @staticmethod
     def process_data(
         collaborative_dir_path: str,
+        sparse_user_threshold: int = 5,
+        sparse_item_threshold: int = 5,
+        split_percent: float = 0.8,
+        segment_size: int = 10000,
     ) -> PipelineResponse:
         
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
-        logger.info("Starting data preprocessing...")
-        
-        # Set default values for parameters 
-        sparse_user_threshold: int = 10,
-        sparse_item_threshold: int = 10,
-        split_percent: float = 0.8,
-        segment_size: int = 10000,
         
         try:
             # Validate input and output paths
