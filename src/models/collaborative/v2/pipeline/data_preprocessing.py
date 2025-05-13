@@ -35,13 +35,13 @@ class DataPreprocessing:
     def drop_sparse_entities(self, df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Dropping sparse users and items...")
         
-        user_counts = df["user_id"].value_counts()
+        user_counts = df["userId"].value_counts()
         valid_users = user_counts[user_counts >= self.sparse_user_threshold].index
         
-        item_counts = df["tmdb_id"].value_counts()
+        item_counts = df["movieId"].value_counts()
         valid_items = item_counts[item_counts >= self.sparse_item_threshold].index
         
-        filtered_df = df[df["user_id"].isin(valid_users) & df["tmdb_id"].isin(valid_items)]
+        filtered_df = df[df["userId"].isin(valid_users) & df["movieId"].isin(valid_items)]
         
         logger.info(f"Filtered dataset: {len(valid_users)} users, {len(valid_items)} items remain.")
         return filtered_df
@@ -49,8 +49,8 @@ class DataPreprocessing:
     def create_mappings(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, dict, dict, dict, dict]:
         logger.info("Creating item and user mappings...")
         
-        unique_users = sorted(df["user_id"].unique())
-        unique_items = sorted(df["tmdb_id"].unique())
+        unique_users = sorted(df["userId"].unique())
+        unique_items = sorted(df["movieId"].unique())
 
         user_mapping = {int(old_id): int(new_id) for new_id, old_id in enumerate(unique_users)}
         user_reverse_mapping = {int(v): int(k) for k, v in user_mapping.items()}
@@ -58,8 +58,8 @@ class DataPreprocessing:
         item_mapping = {int(old_id): int(new_id) for new_id, old_id in enumerate(unique_items)}
         item_reverse_mapping = {int(v): int(k) for k, v in item_mapping.items()}
 
-        df["user_id"] = df["user_id"].map(user_mapping)
-        df["tmdb_id"] = df["tmdb_id"].map(item_mapping)
+        df["userId"] = df["userId"].map(user_mapping)
+        df["movieId"] = df["movieId"].map(item_mapping)
 
         logger.info(f"Generated {len(user_mapping)} user mappings and {len(item_mapping)} item mappings.")
         
@@ -68,8 +68,8 @@ class DataPreprocessing:
     def create_user_item_matrix(self, df: pd.DataFrame) -> sparse.csr_matrix:
         logger.info("Creating user-item matrix...")
 
-        n_users = df["user_id"].max() + 1
-        n_items = df["tmdb_id"].max() + 1
+        n_users = df["userId"].max() + 1
+        n_items = df["movieId"].max() + 1
         
         rows, cols, data = [], [], []
         
@@ -77,8 +77,8 @@ class DataPreprocessing:
             end = start + self.segment_size
             chunk = df.iloc[start:end]
             
-            rows.extend(chunk["user_id"].values)
-            cols.extend(chunk["tmdb_id"].values)
+            rows.extend(chunk["userId"].values)
+            cols.extend(chunk["movieId"].values)
             data.extend(chunk["rating"].values)
             
             del chunk
@@ -109,10 +109,10 @@ class DataPreprocessing:
         test_list = []
 
         # Ensure sorting is done only once
-        data_sorted = df.sort_values(by=['user_id', 'timestamp'])
+        data_sorted = df.sort_values(by=['userId', 'timestamp'])
 
         # Split per user
-        for user_id, user_data in data_sorted.groupby('user_id'):
+        for userId, user_data in data_sorted.groupby('userId'):
             user_interactions = user_data.reset_index(drop=True)
             cutoff = int(len(user_interactions) * self.split_percent)
 
@@ -128,11 +128,11 @@ class DataPreprocessing:
         test_data = pd.concat(test_list, ignore_index=True)
 
         # Optional: Filter test set to users/items seen in training
-        train_users = set(train_data['user_id'])
-        train_items = set(train_data['tmdb_id'])
+        train_users = set(train_data['userId'])
+        train_items = set(train_data['movieId'])
 
-        test_data = test_data[test_data['user_id'].isin(train_users)]
-        test_data = test_data[test_data['tmdb_id'].isin(train_items)]
+        test_data = test_data[test_data['userId'].isin(train_users)]
+        test_data = test_data[test_data['movieId'].isin(train_items)]
 
         logger.info(f"Split dataset: {len(train_data)} training samples, {len(test_data)} test samples")
         return train_data, test_data
@@ -140,7 +140,7 @@ class DataPreprocessing:
     def process(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, dict, dict, dict, dict, sparse.csr_matrix]:
         logger.info("Starting data preprocessing pipeline...")
 
-        required_columns = ["user_id", "tmdb_id", "rating", "timestamp"]
+        required_columns = ["userId", "movieId", "rating", "timestamp", "title", "genres", "tmdbId"]
         if not all(col in df.columns for col in required_columns):
             raise ValueError(f"Input dataframe must contain columns: {required_columns}")
 
@@ -154,12 +154,12 @@ class DataPreprocessing:
         df_combined, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping = self.create_mappings(df)
         
         # Apply mappings to train and test data
-        train["user_id"] = train["user_id"].map(user_mapping)
-        train["tmdb_id"] = train["tmdb_id"].map(item_mapping)
+        train["userId"] = train["userId"].map(user_mapping)
+        train["movieId"] = train["movieId"].map(item_mapping)
         
         test_size_before = len(test)
-        test["user_id"] = test["user_id"].map(user_mapping)
-        test["tmdb_id"] = test["tmdb_id"].map(item_mapping)
+        test["userId"] = test["userId"].map(user_mapping)
+        test["movieId"] = test["movieId"].map(item_mapping)
         test = test.dropna()
         
         logger.info(f"Dropped {test_size_before - len(test)} rows from test due to unmapped users/items.")
