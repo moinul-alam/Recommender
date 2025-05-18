@@ -12,10 +12,6 @@ class PipelineService:
     @staticmethod
     def execute_full_pipeline(
         collaborative_dir_path: str,
-        sparse_user_threshold: int = 10,
-        sparse_item_threshold: int = 10,
-        train_test_split_ratio: float = 0.8,
-        segment_size: int = 10000,
         n_components_item: int = 300,
         n_components_user: int = 300,
         similarity_metric: str = "cosine",
@@ -24,11 +20,7 @@ class PipelineService:
         try:
             # Data Preprocessing
             preprocessing_result = DataPreprocessingService.process_data(
-                collaborative_dir_path,
-                sparse_user_threshold,
-                sparse_item_threshold,
-                train_test_split_ratio,
-                segment_size
+                collaborative_dir_path
             )
             
             if not preprocessing_result:

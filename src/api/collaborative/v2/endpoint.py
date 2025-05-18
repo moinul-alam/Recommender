@@ -309,10 +309,6 @@ def execute_full_pipeline(
         default=str(collaborative_dir_path),
         description="Path to the dataset file"
     ),
-    sparse_user_threshold: int = Query(10, description="Minimum ratings per user"),
-    sparse_item_threshold: int = Query(10, description="Minimum ratings per item"),
-    train_test_split_ratio: float = Query(0.8, description="Train-test split ratio"),
-    segment_size: int = Query(10000, description="Chunk size for processing"),
     n_components_item: int = Query(
         default=300, 
         description="Number of components for item SVD"
@@ -333,10 +329,6 @@ def execute_full_pipeline(
     try:
         result = PipelineService.execute_full_pipeline(
             collaborative_dir_path,
-            sparse_user_threshold,
-            sparse_item_threshold,
-            train_test_split_ratio,
-            segment_size,
             n_components_item,
             n_components_user,
             similarity_metric,
