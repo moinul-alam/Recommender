@@ -1,5 +1,4 @@
-import logging
-from typing import Dict, List, Optional
+from typing import Dict
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from src.config.config import BaseConfig
@@ -14,10 +13,9 @@ from src.models.collaborative.v2.services.user_recommendation_service import Use
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
 from src.models.collaborative.v2.services.evaluation_service import EvaluationService
 from src.schemas.recommender_schema import RecommendationRequest
+from src.models.common.logger import app_logger
 
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logger = app_logger(__name__)
 
 version = 2
 config = BaseConfig()
@@ -34,9 +32,7 @@ async def process_data(
         description="Path to the directory containing dataset and model files"
     ),
 ):
-    logger.info(
-        f"Received data preprocessing request in the route Collaborative v{version} "
-    )
+    logger.info(f"Received data preprocessing request in the route Collaborative v{version}")
 
     try:
         result = DataPreprocessingService.process_data(
@@ -63,33 +59,16 @@ def extract_features(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
-    ),
-    n_components_item: int = Query(
-        default=300, 
-        description="Number of components for item SVD"
-    ),
-    n_components_user: int = Query(
-        default=300, 
-        description="Number of components for user SVD"
-    ),
-    batch_size: int = Query(
-        default=20000, 
-        description="Batch size for processing"
     )
 ):
     logger.info(
         f"Model training request received | "
         f"Directory Path: {collaborative_dir_path}"
-        f"n_components_item: {n_components_item} | "
-        f"n_components_user: {n_components_user}"
     )
 
     try:
         result = FeatureExtractionService.extract_features(
-            collaborative_dir_path,
-            n_components_item,
-            n_components_user,
-            batch_size
+            directory_path = collaborative_dir_path
         ) 
         
         if not result:
@@ -112,21 +91,11 @@ def create_index(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the directory containing dataset and model files"
-    ),
-    similarity_metric: str = Query(
-        default='cosine', 
-        description="Similarity calculation method (euclidean/cosine)"
-    ),
-    batch_size: int = Query(
-        default=10000, 
-        description="Batch size for similarity matrix computation"
     )
 ):
     try:
         result = IndexingService.create_index(
-            collaborative_dir_path,
-            similarity_metric,
-            batch_size
+            directory_path = collaborative_dir_path
         )
         
         if not result:
@@ -150,15 +119,6 @@ async def get_recommendations(
         default=20,
         ge=1,
         le=100
-    ),
-    similarity_metric: str = Query(
-        default='cosine',
-        description="Similarity calculation method (euclidean/cosine)"
-    ),
-    min_similarity: float = Query(
-        default=0,
-        ge=0.0,
-        le=1.0
     )
 ):
     logger.info(f"Received recommendation request: {recommendation_request}")
@@ -166,9 +126,7 @@ async def get_recommendations(
     try:
         return await CollaborativeRecommendationService.get_recommendations(
             recommendation_request,
-            collaborative_dir_path,
-            similarity_metric,
-            min_similarity
+            collaborative_dir_path
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")

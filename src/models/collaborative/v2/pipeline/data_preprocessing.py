@@ -1,11 +1,11 @@
 import logging
-from typing import Tuple
+from typing import Dict, Tuple
 import pandas as pd
 from scipy import sparse
 import gc
+from src.models.common.logger import app_logger
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+logger = app_logger(__name__)
 
 class DataPreprocessing:
     def __init__(
@@ -21,8 +21,6 @@ class DataPreprocessing:
         self.sparse_item_threshold = sparse_item_threshold
         self.split_percent = split_percent
         self.segment_size = segment_size
-        
-        self.logger = logging.getLogger(self.__class__.__name__)
 
     def _validate_parameters(self, sparse_user_threshold: int, sparse_item_threshold: int, split_percent: float) -> None:
         if sparse_user_threshold < 1:
@@ -137,7 +135,7 @@ class DataPreprocessing:
         logger.info(f"Split dataset: {len(train_data)} training samples, {len(test_data)} test samples")
         return train_data, test_data
 
-    def process(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, dict, dict, dict, dict, sparse.csr_matrix]:
+    def process(self, df: pd.DataFrame) -> Dict:
         logger.info("Starting data preprocessing pipeline...")
 
         required_columns = ["userId", "movieId", "rating", "timestamp", "title", "genres", "tmdbId"]
@@ -168,4 +166,12 @@ class DataPreprocessing:
         user_item_matrix = self.create_user_item_matrix(train)
 
         logger.info("Data preprocessing completed successfully.")
-        return train, test, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping, user_item_matrix
+        return {
+            "train": train,
+            "test": test,
+            "user_mapping": user_mapping,
+            "user_reverse_mapping": user_reverse_mapping,
+            "item_mapping": item_mapping,
+            "item_reverse_mapping": item_reverse_mapping,
+            "user_item_matrix": user_item_matrix
+        }

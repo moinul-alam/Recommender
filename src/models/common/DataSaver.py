@@ -3,19 +3,14 @@ import joblib
 import pandas as pd
 from pathlib import Path
 from typing import Union, Dict, Any, Optional
+from src.models.common.logger import app_logger
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(funcName)s - %(levelname)s - %(message)s'
-)
+logger = app_logger(__name__)
 
 def save_to_csv(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str:
     """Save DataFrame to a CSV file."""
     try:
         str_path = str(file_path)
-        logger.info(f"Saving CSV to {str_path}")
         df.to_csv(file_path, **kwargs)
         logger.info(f"Data saved to CSV: {str_path}")
         return str_path
@@ -27,7 +22,6 @@ def save_to_json(df: pd.DataFrame, file_path: Union[str, Path], **kwargs) -> str
     """Save DataFrame to a JSON file."""
     try:
         str_path = str(file_path)
-        logger.info(f"Saving JSON to {str_path}")
         df.to_json(file_path, **kwargs)
         logger.info(f"Data saved to JSON: {str_path}")
         return str_path
@@ -39,8 +33,6 @@ def save_to_pickle(df: pd.DataFrame, file_path: Union[str, Path], protocol: int 
     """Save DataFrame to a pickle file with consistent protocol."""
     try:
         str_path = str(file_path)
-        logger.info(f"Saving Pickle to {str_path} with protocol {protocol}")
-        # Use joblib for all pickle saves
         joblib.dump(df, file_path, compress=3, protocol=protocol)
         logger.info(f"Data saved to pickle: {str_path}")
         return str_path
@@ -53,7 +45,6 @@ def save_to_feather(df: pd.DataFrame, file_path: Union[str, Path]) -> str:
     try:
         import pyarrow  # Check if pyarrow is installed
         str_path = str(file_path)
-        logger.info(f"Saving Feather to {str_path}")
         df.to_feather(file_path)
         logger.info(f"Data saved to feather: {str_path}")
         return str_path

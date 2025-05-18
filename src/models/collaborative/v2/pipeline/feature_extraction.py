@@ -1,11 +1,11 @@
-import logging
 import numpy as np
 from typing import Dict, Tuple
 from scipy import sparse
 from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
+from src.models.common.logger import app_logger
 
-logger = logging.getLogger(__name__)
+logger = app_logger(__name__)
 
 class FeatureExtraction:
     def __init__(

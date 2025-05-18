@@ -1,27 +1,24 @@
-import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.index_creation import IndexCreation
 from src.models.common.file_config import file_names
 from src.models.common.DataLoader import load_data
-from src.models.common.DataSaver import save_data, save_objects
-
+from src.models.common.logger import app_logger
 from src.schemas.content_based_schema import PipelineResponse
 
+logger = app_logger(__name__)
 
 class IndexingService:
     @staticmethod
     def create_index(
-        collaborative_dir_path: str,
-        similarity_metric: str = "cosine",
-        batch_size: int = 20000
+        directory_path: str
     ) -> Optional[PipelineResponse]:
         """
         Create and save FAISS indexes for user and item matrices.
         
         Args:
-            collaborative_dir_path: Directory containing matrices and where indexes will be saved
+            directory_path: Directory containing matrices and where indexes will be saved
             file_names: Dictionary with keys for user_matrix, item_matrix, faiss_user_index, faiss_item_index
             similarity_metric: Similarity metric to use (cosine or inner_product)
             batch_size: Batch size for adding vectors to FAISS index
@@ -29,16 +26,17 @@ class IndexingService:
         Returns:
             PipelineResponse object with status and message, or None if error occurs
         """
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
-
+        # Default values
+        similarity_metric: str = "cosine",
+        batch_size: int = 20000
+        
         try:
             # Convert path to Path object and validate
-            collaborative_dir_path = Path(collaborative_dir_path)
-            if not collaborative_dir_path.exists() or not collaborative_dir_path.is_dir():
+            directory_path = Path(directory_path)
+            if not directory_path.exists() or not directory_path.is_dir():
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid directory path: {collaborative_dir_path}"
+                    detail=f"Invalid directory path: {directory_path}"
                 )
             
             # Validate required file names
@@ -51,8 +49,8 @@ class IndexingService:
                 )
             
             # Construct and validate input file paths
-            user_matrix_path = collaborative_dir_path / file_names["user_matrix"]
-            item_matrix_path = collaborative_dir_path / file_names["item_matrix"]
+            user_matrix_path = directory_path / file_names["user_matrix"]
+            item_matrix_path = directory_path / file_names["item_matrix"]
             
             if not user_matrix_path.is_file():
                 raise HTTPException(
@@ -92,8 +90,8 @@ class IndexingService:
                 batch_size=batch_size
             )
             
-            user_index_path = collaborative_dir_path / file_names["faiss_user_index"]
-            item_index_path = collaborative_dir_path / file_names["faiss_item_index"]
+            user_index_path = directory_path / file_names["faiss_user_index"]
+            item_index_path = directory_path / file_names["faiss_item_index"]
             
             logger.info(f"Creating user index at {user_index_path}")
             user_index = indexer.create_faiss_index(
@@ -114,7 +112,7 @@ class IndexingService:
             return PipelineResponse(
                 status="success",
                 message="FAISS index creation completed successfully.",
-                output=str(collaborative_dir_path),
+                output=str(directory_path),
             )
 
         except HTTPException as http_err:
