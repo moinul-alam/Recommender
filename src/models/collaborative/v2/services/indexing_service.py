@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.index_creation import IndexCreation
 from src.models.common.file_config import file_names
 from src.models.common.DataLoader import load_data
+from src.models.common.DataSaver import save_object
 from src.models.common.logger import app_logger
 from src.schemas.content_based_schema import PipelineResponse
 
@@ -15,19 +16,16 @@ class IndexingService:
         directory_path: str
     ) -> Optional[PipelineResponse]:
         """
-        Create and save FAISS indexes for user and item matrices.
+        Create and save FAISS indexes for user and item matrices, and update model_info with similarity metric.
         
         Args:
             directory_path: Directory containing matrices and where indexes will be saved
-            file_names: Dictionary with keys for user_matrix, item_matrix, faiss_user_index, faiss_item_index
-            similarity_metric: Similarity metric to use (cosine or inner_product)
-            batch_size: Batch size for adding vectors to FAISS index
             
         Returns:
             PipelineResponse object with status and message, or None if error occurs
         """
         # Default values
-        similarity_metric: str = "cosine",
+        similarity_metric: str = "cosine"
         batch_size: int = 20000
         
         try:
@@ -40,7 +38,7 @@ class IndexingService:
                 )
             
             # Validate required file names
-            required_keys = ["user_matrix", "item_matrix", "faiss_user_index", "faiss_item_index"]
+            required_keys = ["user_matrix", "item_matrix", "faiss_user_index", "faiss_item_index", "model_info"]
             missing_keys = [key for key in required_keys if key not in file_names]
             if missing_keys:
                 raise HTTPException(
@@ -51,6 +49,7 @@ class IndexingService:
             # Construct and validate input file paths
             user_matrix_path = directory_path / file_names["user_matrix"]
             item_matrix_path = directory_path / file_names["item_matrix"]
+            model_info_path = directory_path / file_names["model_info"]  # Should not include .pkl extension
             
             if not user_matrix_path.is_file():
                 raise HTTPException(
@@ -85,6 +84,38 @@ class IndexingService:
                 logger.warning(f"Unrecognized similarity metric: {similarity_metric}, defaulting to cosine")
                 similarity_metric = "cosine"
             
+            # Load and update model_info
+            model_info = {}
+            if model_info_path.is_file():
+                logger.info(f"Loading model_info from {model_info_path}")
+                model_info = load_data(model_info_path)
+                if model_info is None:
+                    logger.warning(f"Failed to load model_info, creating new dictionary")
+                    model_info = {}
+            else:
+                logger.info(f"model_info file not found at {model_info_path}, creating new dictionary")
+            
+            # Update model_info with similarity_metric
+            model_info["similarity_metric"] = similarity_metric
+            logger.info(f"Updated model_info with similarity_metric: {similarity_metric}")
+            
+            # Save updated model_info using save_object
+            logger.info(f"Saving updated model_info to {model_info_path}")
+            try:
+                saved_path = save_object(
+                    directory_path=directory_path,
+                    obj=model_info,
+                    file_name=file_names["model_info"],
+                    protocol=4,
+                    compress=3
+                )
+                logger.info(f"Successfully saved model_info to {saved_path}")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to save updated model_info to {model_info_path}: {str(e)}"
+                )
+            
             indexer = IndexCreation(
                 similarity_metric=similarity_metric,
                 batch_size=batch_size
@@ -111,7 +142,7 @@ class IndexingService:
                         
             return PipelineResponse(
                 status="success",
-                message="FAISS index creation completed successfully.",
+                message="FAISS index creation and model_info update completed successfully.",
                 output=str(directory_path),
             )
 

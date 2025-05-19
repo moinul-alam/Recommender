@@ -7,7 +7,7 @@ from src.models.collaborative.v2.services.pipeline_service import PipelineServic
 from src.models.collaborative.v2.services.data_preprocessing_service import DataPreprocessingService
 from src.models.collaborative.v2.services.feature_extraction_service import FeatureExtractionService
 from src.models.collaborative.v2.services.indexing_service import IndexingService
-from src.models.collaborative.v2.services.collaborative_recommendation_service import CollaborativeRecommendationService
+from src.models.collaborative.v2.services.recommendation_service import RecommendationService
 
 from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.collaborative.v2.services.item_recommendation_service import ItemRecommendationService
@@ -115,18 +115,17 @@ Recommendation Endpoints
 @collaborative_router_v2.post("/recommendations")
 async def get_recommendations(
     recommendation_request: RecommendationRequest,
-    n_recommendations: int = Query(
-        default=20,
-        ge=1,
-        le=100
-    )
+    collaborative_dir_path: str = Query(
+        default=str(collaborative_dir_path),
+        description="Path to the directory"
+    ),
 ):
     logger.info(f"Received recommendation request: {recommendation_request}")
     
     try:
-        return await CollaborativeRecommendationService.get_recommendations(
+        return await RecommendationService.get_recommendations(
             recommendation_request,
-            collaborative_dir_path
+            directory_path=collaborative_dir_path
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding recommendation: {str(e)}")
@@ -256,41 +255,20 @@ def evaluate(
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-    
-    
-    
-    
-    
+
+"""
+Full Pipeline Execution
+"""    
 @collaborative_router_v2.post("/execute-pipeline")
 def execute_full_pipeline(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to the dataset file"
-    ),
-    n_components_item: int = Query(
-        default=300, 
-        description="Number of components for item SVD"
-    ),
-    n_components_user: int = Query(
-        default=300, 
-        description="Number of components for user SVD"
-    ),
-    similarity_metric: str = Query(
-        default='cosine', 
-        description="Similarity calculation method (euclidean/cosine)"
-    ),
-    batch_size: int = Query(
-        default=10000, 
-        description="Batch size for similarity matrix computation"
     )
 ):
     try:
         result = PipelineService.execute_full_pipeline(
-            collaborative_dir_path,
-            n_components_item,
-            n_components_user,
-            similarity_metric,
-            batch_size
+            directory_path=collaborative_dir_path
         )
         return result
     except Exception as e:

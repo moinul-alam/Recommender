@@ -54,7 +54,6 @@ class DataPreprocessingService:
 
             # Load dataset
             dataset = load_data(dataset_path)
-            logger.info(f"Dataset loaded from {dataset_path}")
             if dataset is None or dataset.empty:
                 raise HTTPException(status_code=400, detail="Dataset is empty or invalid")
 
@@ -71,32 +70,14 @@ class DataPreprocessingService:
             if results is None or not results:
                 raise HTTPException(status_code=400, detail="Preprocessed data is empty or invalid")
 
-            # Log preprocessing results
-            logger.info(f"Preprocessing complete. Train set size: {len(results['train'])}, "
-                        f"Test set size: {len(results['test'])}")
-            logger.info(f"User mapping size: {len(results['user_mapping'])}, "
-                        f"Item mapping size: {len(results['item_mapping'])}")
-            logger.info(f"User-item matrix shape: {results['user_item_matrix'].shape}")
-
-            # Sample output for debugging
-            if results["item_mapping"]:
-                logger.info(f"Sample item mappings (first 5): {list(results['item_mapping'].items())[:5]}")
-                logger.info(f"Sample item reverse mappings (first 5): {list(results['item_reverse_mapping'].items())[:5]}")
-
-            # Prepare mappings for saving
-            user_item_mappings = {
-                "user_mapping": results["user_mapping"],
-                "user_reverse_mapping": results["user_reverse_mapping"],
-                "item_mapping": results["item_mapping"],
-                "item_reverse_mapping": results["item_reverse_mapping"]
-            }
 
             # Files to save
             files_to_save = {
                 file_names["train_set"]: results["train"],
                 file_names["test_set"]: results["test"],
                 file_names["user_item_matrix"]: results["user_item_matrix"],
-                file_names["user_item_mappings"]: user_item_mappings
+                file_names["user_item_mappings"]: results["user_item_mappings"],
+                file_names["movieId_tmdbId_mapping"]: results["movieId_tmdbId_mapping"]
             }
 
             # Save processed data
@@ -106,11 +87,47 @@ class DataPreprocessingService:
                 compress=3
             )
 
-            # Test the saved user-item matrix
+            # Test the saved user-item matrix with multiple users
             logger.info("Testing the saved user-item matrix...")
-            test_user_idx = 0
             user_item_matrix = results['user_item_matrix']
-            if user_item_matrix.shape[0] > test_user_idx:
+            
+            # Get statistics on the matrix
+            nnz_per_user = [user_item_matrix[i].nnz for i in range(user_item_matrix.shape[0])]
+            users_with_ratings = sum(1 for x in nnz_per_user if x > 0)
+            total_users = user_item_matrix.shape[0]
+            
+            logger.info(f"Matrix statistics: {users_with_ratings}/{total_users} users have ratings")
+            
+            # Check density distribution
+            if users_with_ratings > 0:
+                avg_items_per_user = sum(nnz_per_user) / users_with_ratings
+                logger.info(f"Average items per user with ratings: {avg_items_per_user:.2f}")
+            
+            # Sample a few users to check (first, middle, and last with ratings)
+            users_to_check = []
+            
+            # Add first user with ratings
+            for i in range(total_users):
+                if user_item_matrix[i].nnz > 0:
+                    users_to_check.append(i)
+                    break
+            
+            # Add a user from the middle with ratings if available
+            mid_user = total_users // 2
+            search_range = min(100, total_users // 4)  # Look in the vicinity of the middle
+            for i in range(mid_user - search_range, min(mid_user + search_range, total_users)):
+                if 0 <= i < total_users and user_item_matrix[i].nnz > 0 and i not in users_to_check:
+                    users_to_check.append(i)
+                    break
+            
+            # Add last user with ratings
+            for i in range(total_users - 1, -1, -1):
+                if user_item_matrix[i].nnz > 0 and i not in users_to_check:
+                    users_to_check.append(i)
+                    break
+            
+            # Display ratings for selected users
+            for test_user_idx in users_to_check:
                 test_item_indices = user_item_matrix[test_user_idx].indices
                 ratings = user_item_matrix[test_user_idx].data
 
@@ -118,19 +135,34 @@ class DataPreprocessingService:
                 logger.info(f"User {test_user_idx} has rated {num_items_rated} items.")
 
                 max_items_to_show = 5
-                if num_items_rated > max_items_to_show:
-                    logger.info(f"Showing ratings for the first {max_items_to_show} items:")
+                if num_items_rated > 0:
+                    show_items = min(max_items_to_show, num_items_rated)
+                    logger.info(f"Showing ratings for {show_items} items:")
+                    for item, rating in zip(test_item_indices[:show_items], ratings[:show_items]):
+                        logger.info(f"User {test_user_idx} -> Item {item} with rating {rating}")
                 else:
-                    logger.info(f"Showing ratings for all {num_items_rated} items:")
-
-                for item, rating in zip(test_item_indices[:max_items_to_show], ratings[:max_items_to_show]):
-                    logger.info(f"User {test_user_idx} -> Item {item} with rating {rating}")
-            else:
-                logger.warning(f"No ratings available for user {test_user_idx} in the user-item matrix.")
-
-            # Test user-item mappings
-            logger.info(f"Testing user item mappings: {list(user_item_mappings.keys())}")
-            logger.info(f"Sample user_mapping: {list(user_item_mappings['user_mapping'].items())[:5]}")
+                    logger.warning(f"No ratings available for user {test_user_idx} in the user-item matrix.")
+            
+            # Verify matrix corresponds to training data
+            train_df = results["train"]
+            sample_size = min(5, len(train_df))
+            if sample_size > 0:
+                logger.info("Verifying matrix entries against training data:")
+                sample = train_df.sample(sample_size)
+                
+                for _, row in sample.iterrows():
+                    user_id = int(row["userId"])
+                    item_id = int(row["movieId"])
+                    expected_rating = float(row["rating"])
+                    
+                    if user_id < user_item_matrix.shape[0] and item_id < user_item_matrix.shape[1]:
+                        actual_rating = user_item_matrix[user_id, item_id]
+                        if actual_rating == expected_rating:
+                            logger.info(f"Verified: User {user_id} -> Item {item_id} = {actual_rating}")
+                        else:
+                            logger.warning(f"Mismatch: User {user_id} -> Item {item_id}, expected {expected_rating}, got {actual_rating}")
+                    else:
+                        logger.warning(f"Out of bounds: User {user_id} -> Item {item_id} outside matrix dimensions {user_item_matrix.shape}")
 
             logger.info(f"Data saved successfully in {directory_path}")
 

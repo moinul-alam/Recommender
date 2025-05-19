@@ -1,6 +1,6 @@
 import numpy as np
 import faiss
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,10 @@ class ItemRecommender:
         self.user_item_mappings = user_item_mappings
         self.similarity_metric = similarity_metric
         self.min_similarity = min_similarity
+        
+        # Extract item mappings
+        self.item_mapping = self.user_item_mappings.get("item_mapping", {})
+        self.item_reverse_mapping = self.user_item_mappings.get("item_reverse_mapping", {})
 
     def convert_to_similarity(self, inner_product: float) -> float:
         """
@@ -35,27 +39,21 @@ class ItemRecommender:
         
     def generate_recommendations(
         self,
-        item_ids: dict,
+        item_ids: List[Tuple[int, float]],
         n_recommendations: int
     ) -> List[Dict]:
         """Finds similar items for multiple movies (content-based filtering)."""
         try:
-            item_ids = [int(tmdb_id) for tmdb_id, _ in item_ids]
+            item_ids = [int(movie_id) for movie_id, _ in item_ids]
             
             if not item_ids:
                 return []
             
-            # Map TMDB IDs to internal indices
-            item_mapping = self.user_item_mappings["item_mapping"]
-            if item_mapping is None:
-                raise ValueError("User mapping not found in the provided mappings.")            
+            # Map movie IDs to internal indices
+            item_indices = [self.item_mapping.get(movie_id) for movie_id in item_ids if movie_id in self.item_mapping]
             
-            item_reverse_mapping = self.user_item_mappings["item_reverse_mapping"]
-            if item_reverse_mapping is None:
-                raise ValueError("User reverse mapping not found in the provided mappings.")
-            
-            item_indices = [item_mapping.get(tmdb_id) for tmdb_id in item_ids if tmdb_id in item_mapping]
             if not item_indices:
+                logger.warning(f"None of the provided movie IDs {item_ids} could be mapped to internal indices")
                 return []
 
             # Aggregate item vectors
@@ -81,7 +79,8 @@ class ItemRecommender:
 
             for idx, dist in zip(indices[0], distances[0]):
                 if idx >= 0 and idx not in query_items_set:
-                    similar_tmdb_id = item_reverse_mapping.get(idx)
+                    # Convert internal index back to tmdb_id
+                    similar_tmdb_id = self.item_reverse_mapping.get(idx)
                     if similar_tmdb_id is None:
                         continue
                         
@@ -94,7 +93,8 @@ class ItemRecommender:
 
                     recommendations.append({
                         "tmdb_id": int(similar_tmdb_id),
-                        "similarity": float(similarity_score)
+                        "similarity": float(similarity_score),
+                        "predicted_rating": None  # Item-based doesn't predict rating
                     })
 
                     if len(recommendations) == n_recommendations:

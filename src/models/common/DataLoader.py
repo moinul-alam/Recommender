@@ -3,12 +3,10 @@ import logging
 import joblib
 import pandas as pd
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
+from src.models.common.logger import app_logger
 
-
-# Configure logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = app_logger(__name__)
 
 
 def load_from_json(file_path: str) -> pd.DataFrame:

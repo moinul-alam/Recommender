@@ -8,6 +8,7 @@ file_names = {
     "item_reverse_mapping": "2_item_reverse_mapping.pkl",
     "user_item_mappings": "2_user_item_mappings.pkl",
     "user_item_matrix": "2_user_item_matrix.pkl",
+    "movieId_tmdbId_mapping": "2_movieId_tmdbId_mapping.pkl",
     "user_matrix": "3_user_matrix.pkl",
     "item_matrix": "3_item_matrix.pkl",
     "user_means": "3_user_means.pkl",

@@ -33,6 +33,8 @@ class DataPreprocessing:
     def drop_sparse_entities(self, df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Dropping sparse users and items...")
         
+        df = df.copy()
+        
         user_counts = df["userId"].value_counts()
         valid_users = user_counts[user_counts >= self.sparse_user_threshold].index
         
@@ -44,8 +46,11 @@ class DataPreprocessing:
         logger.info(f"Filtered dataset: {len(valid_users)} users, {len(valid_items)} items remain.")
         return filtered_df
 
-    def create_mappings(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, dict, dict, dict, dict]:
+    def create_mappings(self, df: pd.DataFrame) -> Dict:
+        """Create contiguous mappings for user and item IDs"""
         logger.info("Creating item and user mappings...")
+        
+        df = df.copy()
         
         unique_users = sorted(df["userId"].unique())
         unique_items = sorted(df["movieId"].unique())
@@ -56,18 +61,64 @@ class DataPreprocessing:
         item_mapping = {int(old_id): int(new_id) for new_id, old_id in enumerate(unique_items)}
         item_reverse_mapping = {int(v): int(k) for k, v in item_mapping.items()}
 
+        # Apply mappings to the dataframe
         df["userId"] = df["userId"].map(user_mapping)
         df["movieId"] = df["movieId"].map(item_mapping)
 
         logger.info(f"Generated {len(user_mapping)} user mappings and {len(item_mapping)} item mappings.")
         
-        return df, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping
+        return {
+            "user_mapping": user_mapping,
+            "user_reverse_mapping": user_reverse_mapping,
+            "item_mapping": item_mapping,
+            "item_reverse_mapping": item_reverse_mapping,
+            "mapped_df": df 
+        }
+        
+    def create_movieId_tmdbId_mapping(self, df: pd.DataFrame, item_mapping: Dict[int, int]) -> Dict[int, int]:
+        """Create mapping between mapped movieIds and tmdbIds"""
+        logger.info("Creating movieId to tmdbId mapping...")
+        
+        df = df.copy()
+        
+        # Create mapping from mapped movieIds to tmdbIds
+        movieId_tmdbId_mapping = {}
+        
+        for _, row in df.iterrows():
+            original_movie_id = int(row["movieId"])
+            tmdb_id = int(row["tmdbId"])
+            
+            # Get the mapped movie ID
+            if original_movie_id in item_mapping:
+                mapped_movie_id = item_mapping[original_movie_id]
+                movieId_tmdbId_mapping[mapped_movie_id] = tmdb_id
+        
+        logger.info(f"Generated mapping for {len(movieId_tmdbId_mapping)} items.")
+        return movieId_tmdbId_mapping
 
     def create_user_item_matrix(self, df: pd.DataFrame) -> sparse.csr_matrix:
+        """Create user-item matrix from the mapped dataframe"""
         logger.info("Creating user-item matrix...")
+        
+        df = df.copy()
 
-        n_users = df["userId"].max() + 1
-        n_items = df["movieId"].max() + 1
+        # Get the number of unique users and items
+        n_users = df["userId"].nunique()
+        n_items = df["movieId"].nunique()
+        
+        # Verify the maximum indices match our expectations
+        max_user_idx = df["userId"].max()
+        max_item_idx = df["movieId"].max()
+        
+        if max_user_idx >= n_users:
+            logger.warning(f"Max user index {max_user_idx} >= number of unique users {n_users}")
+            n_users = max_user_idx + 1
+            
+        if max_item_idx >= n_items:
+            logger.warning(f"Max item index {max_item_idx} >= number of unique items {n_items}")
+            n_items = max_item_idx + 1
+        
+        logger.info(f"Creating matrix with {n_users} users and {n_items} items")
         
         rows, cols, data = [], [], []
         
@@ -90,10 +141,23 @@ class DataPreprocessing:
         del rows, cols, data
         gc.collect()
 
+        # Verify the matrix has the expected number of non-zero elements
+        expected_nnz = len(df)
+        if user_item_matrix.nnz != expected_nnz:
+            logger.warning(f"Matrix has {user_item_matrix.nnz} non-zero elements, expected {expected_nnz}")
+        
+        # Log matrix density and stats
+        density = user_item_matrix.nnz / (n_users * n_items)
         logger.info(
             f"Created sparse matrix: {user_item_matrix.shape}, "
-            f"density: {user_item_matrix.nnz / (n_users * n_items):.4%}"
+            f"density: {density:.4%}, "
+            f"non-zero elements: {user_item_matrix.nnz}"
         )
+        
+        # Count users with interactions
+        users_with_interactions = sum(1 for i in range(n_users) if user_item_matrix[i].nnz > 0)
+        logger.info(f"Users with at least one interaction: {users_with_interactions}/{n_users}")
+        
         return user_item_matrix
 
     def split_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -113,6 +177,12 @@ class DataPreprocessing:
         for userId, user_data in data_sorted.groupby('userId'):
             user_interactions = user_data.reset_index(drop=True)
             cutoff = int(len(user_interactions) * self.split_percent)
+            
+            # Ensure each user has at least one item in training and test
+            if cutoff == 0:
+                cutoff = 1
+            elif cutoff == len(user_interactions):
+                cutoff = len(user_interactions) - 1
 
             # Split into train/test
             train_user = user_interactions.iloc[:cutoff]
@@ -142,36 +212,30 @@ class DataPreprocessing:
         if not all(col in df.columns for col in required_columns):
             raise ValueError(f"Input dataframe must contain columns: {required_columns}")
 
-        # Filter sparse entities first
-        df = self.drop_sparse_entities(df)
-
-        # Split data into train and test sets
-        train, test = self.split_dataset(df)
-
-        # Create mappings based on the complete dataset to ensure consistency
-        df_combined, user_mapping, user_reverse_mapping, item_mapping, item_reverse_mapping = self.create_mappings(df)
+        # Drop sparse entities first
+        filtered_df = self.drop_sparse_entities(df)
         
-        # Apply mappings to train and test data
-        train["userId"] = train["userId"].map(user_mapping)
-        train["movieId"] = train["movieId"].map(item_mapping)
+        # Create mappings on filtered data
+        mapping_results = self.create_mappings(filtered_df)
+        mapped_df = mapping_results.pop("mapped_df")  # Extract mapped df and remove from dict
         
-        test_size_before = len(test)
-        test["userId"] = test["userId"].map(user_mapping)
-        test["movieId"] = test["movieId"].map(item_mapping)
-        test = test.dropna()
+        # Split the mapped dataset
+        train, test = self.split_dataset(mapped_df)
         
-        logger.info(f"Dropped {test_size_before - len(test)} rows from test due to unmapped users/items.")
-
-        # Create user-item matrix from training data
+        # Create matrices and mappings based on the mapped and filtered data
         user_item_matrix = self.create_user_item_matrix(train)
+        
+        # Create movieId to tmdbId mapping using the original df and the item mapping
+        movieId_tmdbId_mapping = self.create_movieId_tmdbId_mapping(
+            filtered_df, 
+            mapping_results["item_mapping"]
+        )
 
         logger.info("Data preprocessing completed successfully.")
         return {
             "train": train,
             "test": test,
-            "user_mapping": user_mapping,
-            "user_reverse_mapping": user_reverse_mapping,
-            "item_mapping": item_mapping,
-            "item_reverse_mapping": item_reverse_mapping,
-            "user_item_matrix": user_item_matrix
+            "user_item_mappings": mapping_results,
+            "user_item_matrix": user_item_matrix,
+            "movieId_tmdbId_mapping": movieId_tmdbId_mapping
         }

@@ -3,7 +3,7 @@ import logging
 from fastapi import HTTPException
 from src.models.collaborative.v2.pipeline.item_recommender import ItemRecommender
 from src.models.collaborative.v2.services.base_recommendation_service import BaseRecommendationService
-from src.schemas.recommender_schema import Recommendation, RecommendationResponse, RecommendationRequest, RecommendationRequestedItem
+from src.schemas.recommender_schema import Recommendation, RecommendationResponse, RecommendationRequest
 
 
 logger = logging.getLogger(__name__)
