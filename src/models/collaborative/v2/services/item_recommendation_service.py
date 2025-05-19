@@ -12,7 +12,7 @@ class ItemRecommendationService:
     @staticmethod
     def get_item_recommendations(
         recommendation_request: RecommendationRequest,
-        collaborative_dir_path: str,
+        directory_path: str,
         similarity_metric: str,
         min_similarity: float
     ) -> RecommendationResponse:
@@ -21,7 +21,7 @@ class ItemRecommendationService:
         
         Args:
             items: List of item IDs to base recommendations on
-            collaborative_dir_path: Directory path containing model files
+            directory_path: Directory path containing model files
             file_names: Dictionary mapping component names to filenames
             n_recommendations: Number of recommendations to return
             min_similarity: Minimum similarity threshold for recommendations
@@ -47,7 +47,7 @@ class ItemRecommendationService:
             logger.info(f"Items for recommendation: {liked_items}")
 
             # Load model components
-            components = BaseRecommendationService.load_model_components(collaborative_dir_path)
+            components = BaseRecommendationService.load_model_components(directory_path)
             
             logger.info(f"Loaded model components: {components.keys()}")
             # Initialize recommender

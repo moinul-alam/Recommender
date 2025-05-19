@@ -113,7 +113,7 @@ def create_index(
 Recommendation Endpoints
 """
 @collaborative_router_v2.post("/recommendations")
-async def get_recommendations(
+def get_recommendations(
     recommendation_request: RecommendationRequest,
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
@@ -123,7 +123,7 @@ async def get_recommendations(
     logger.info(f"Received recommendation request: {recommendation_request}")
     
     try:
-        return await RecommendationService.get_recommendations(
+        return RecommendationService.get_recommendations(
             recommendation_request,
             directory_path=collaborative_dir_path
         )
@@ -139,15 +139,6 @@ def get_item_recommendations(
     collaborative_dir_path: str = Query(
         default=str(collaborative_dir_path),
         description="Path to preprocessed dataset"
-    ),
-    similarity_metric: str = Query(
-        default='cosine',
-        description="Similarity calculation method (euclidean/cosine)"
-    ),
-    min_similarity: float = Query(
-        default=0.0,
-        ge=0.0,
-        le=1.0
     )
 ):
     try:
@@ -155,9 +146,7 @@ def get_item_recommendations(
         
         recommendations = ItemRecommendationService.get_item_recommendations(
             recommendation_request,
-            collaborative_dir_path,
-            similarity_metric,
-            min_similarity
+            directory_path = collaborative_dir_path
         )
 
         if not recommendations:

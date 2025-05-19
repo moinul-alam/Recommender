@@ -14,13 +14,19 @@ class ItemRecommender:
         embedding_matrix: np.ndarray,
         user_item_mappings: dict,
         similarity_metric: str = 'cosine',
-        min_similarity: float = 0.1
+        min_similarity: float = 0.1,
+        tmdb_to_movie_map: Dict = None,
+        movie_to_tmdb_map: Dict = None,
+        req_source: str = "movieId"
     ):
         self.faiss_index = faiss_index
         self.embedding_matrix = embedding_matrix
         self.user_item_mappings = user_item_mappings
         self.similarity_metric = similarity_metric
         self.min_similarity = min_similarity
+        self.tmdb_to_movie_map = tmdb_to_movie_map
+        self.movie_to_tmdb_map = movie_to_tmdb_map
+        self.req_source = req_source
         
         # Extract item mappings
         self.item_mapping = self.user_item_mappings.get("item_mapping", {})
@@ -44,13 +50,13 @@ class ItemRecommender:
     ) -> List[Dict]:
         """Finds similar items for multiple movies (content-based filtering)."""
         try:
-            item_ids = [int(movie_id) for movie_id, _ in item_ids]
+            item_ids = [int(movieId) for movieId, _ in item_ids]
             
             if not item_ids:
                 return []
             
             # Map movie IDs to internal indices
-            item_indices = [self.item_mapping.get(movie_id) for movie_id in item_ids if movie_id in self.item_mapping]
+            item_indices = [self.item_mapping.get(movieId) for movieId in item_ids if movieId in self.item_mapping]
             
             if not item_indices:
                 logger.warning(f"None of the provided movie IDs {item_ids} could be mapped to internal indices")
@@ -79,9 +85,9 @@ class ItemRecommender:
 
             for idx, dist in zip(indices[0], distances[0]):
                 if idx >= 0 and idx not in query_items_set:
-                    # Convert internal index back to tmdb_id
-                    similar_tmdb_id = self.item_reverse_mapping.get(idx)
-                    if similar_tmdb_id is None:
+                    # Convert internal index back to tmdbId
+                    similar_tmdbId = self.item_reverse_mapping.get(idx)
+                    if similar_tmdbId is None:
                         continue
                         
                     # Convert to similarity in 0-1 range
@@ -91,11 +97,24 @@ class ItemRecommender:
                     if similarity_score < self.min_similarity:
                         continue
 
-                    recommendations.append({
-                        "tmdb_id": int(similar_tmdb_id),
+                    # Format recommendation based on request source
+                    recommendation = {
                         "similarity": float(similarity_score),
                         "predicted_rating": None  # Item-based doesn't predict rating
-                    })
+                    }
+
+                    # Handle ID mapping based on request source
+                    if self.req_source == "tmdb":
+                        recommendation["tmdbId"] = int(similar_tmdbId)
+                    else:  # movieId request
+                        # Convert tmdbId to movieId
+                        if str(similar_tmdbId) in self.tmdb_to_movie_map:
+                            recommendation["movieId"] = int(self.tmdb_to_movie_map[str(similar_tmdbId)])
+                        else:
+                            # Skip items that can't be mapped
+                            continue
+
+                    recommendations.append(recommendation)
 
                     if len(recommendations) == n_recommendations:
                         break

@@ -75,26 +75,46 @@ class DataPreprocessing:
             "mapped_df": df 
         }
         
-    def create_movieId_tmdbId_mapping(self, df: pd.DataFrame, item_mapping: Dict[int, int]) -> Dict[int, int]:
-        """Create mapping between mapped movieIds and tmdbIds"""
-        logger.info("Creating movieId to tmdbId mapping...")
+    def create_id_mappings(self, df: pd.DataFrame, item_mapping: Dict[int, int]) -> Dict:
+        """Create mappings between original movieIds, mapped movieIds, and tmdbIds"""
+        logger.info("Creating comprehensive ID mappings...")
         
         df = df.copy()
         
-        # Create mapping from mapped movieIds to tmdbIds
-        movieId_tmdbId_mapping = {}
+        # Mappings to create:
+        # 1. Mapped movieId to tmdbId (for model internals)
+        # 2. Original movieId to tmdbId (for API request/response)
+        # 3. tmdbId to original movieId (for API request/response)
+        mapped_id_to_tmdb = {}  # internal mapped ID → tmdbId
+        movie_to_tmdb = {}      # original movieId → tmdbId 
+        tmdb_to_movie = {}      # tmdbId → original movieId
         
+        # Process each row to create all necessary mappings
         for _, row in df.iterrows():
             original_movie_id = int(row["movieId"])
             tmdb_id = int(row["tmdbId"])
             
-            # Get the mapped movie ID
+            # Convert IDs to strings for consistent key type in mappings
+            str_original_id = str(original_movie_id)
+            str_tmdb_id = str(tmdb_id)
+            
+            # Create bidirectional mappings between original movieId and tmdbId
+            movie_to_tmdb[str_original_id] = str_tmdb_id
+            tmdb_to_movie[str_tmdb_id] = str_original_id
+            
+            # Create mapping from mapped movieId to tmdbId (for internal model use)
             if original_movie_id in item_mapping:
                 mapped_movie_id = item_mapping[original_movie_id]
-                movieId_tmdbId_mapping[mapped_movie_id] = tmdb_id
+                mapped_id_to_tmdb[mapped_movie_id] = tmdb_id
         
-        logger.info(f"Generated mapping for {len(movieId_tmdbId_mapping)} items.")
-        return movieId_tmdbId_mapping
+        logger.info(f"Generated mappings for {len(mapped_id_to_tmdb)} mapped items, " 
+                    f"{len(movie_to_tmdb)} original items, and {len(tmdb_to_movie)} TMDB items.")
+        
+        return {
+            "mapped_id_to_tmdb": mapped_id_to_tmdb,  # For model internals
+            "movie_to_tmdb_mapping": movie_to_tmdb,  # For API
+            "tmdb_to_movie_mapping": tmdb_to_movie   # For API
+        }
 
     def create_user_item_matrix(self, df: pd.DataFrame) -> sparse.csr_matrix:
         """Create user-item matrix from the mapped dataframe"""
@@ -225,8 +245,8 @@ class DataPreprocessing:
         # Create matrices and mappings based on the mapped and filtered data
         user_item_matrix = self.create_user_item_matrix(train)
         
-        # Create movieId to tmdbId mapping using the original df and the item mapping
-        movieId_tmdbId_mapping = self.create_movieId_tmdbId_mapping(
+        # Create comprehensive ID mappings
+        id_mappings = self.create_id_mappings(
             filtered_df, 
             mapping_results["item_mapping"]
         )
@@ -237,5 +257,7 @@ class DataPreprocessing:
             "test": test,
             "user_item_mappings": mapping_results,
             "user_item_matrix": user_item_matrix,
-            "movieId_tmdbId_mapping": movieId_tmdbId_mapping
+            "mapped_id_to_tmdb": id_mappings["mapped_id_to_tmdb"],      # For model internals
+            "movie_to_tmdb_mapping": id_mappings["movie_to_tmdb_mapping"],  # For API
+            "tmdb_to_movie_mapping": id_mappings["tmdb_to_movie_mapping"]   # For API
         }

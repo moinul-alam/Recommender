@@ -77,7 +77,9 @@ class DataPreprocessingService:
                 file_names["test_set"]: results["test"],
                 file_names["user_item_matrix"]: results["user_item_matrix"],
                 file_names["user_item_mappings"]: results["user_item_mappings"],
-                file_names["movieId_tmdbId_mapping"]: results["movieId_tmdbId_mapping"]
+                file_names["mapped_id_to_tmdb"]: results["mapped_id_to_tmdb"],
+                file_names["movie_to_tmdb_mapping"]: results["movie_to_tmdb_mapping"],
+                file_names["tmdb_to_movie_mapping"]: results["tmdb_to_movie_mapping"]
             }
 
             # Save processed data

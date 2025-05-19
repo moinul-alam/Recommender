@@ -38,34 +38,3 @@ class RecommendationResponse(BaseModel):
     """Response model for recommendation API"""
     status: str
     recommendations: Dict[str, RecommendationCategory]
-
-# class RecommendationRequestedItem(BaseModel):
-#     req_source: Optional[str] = None
-#     tmdb_id: Optional[int] = None
-#     movieId: Optional[int] = None
-#     rating: Optional[float] = None
-
-#     @model_validator(mode='before')
-#     def check_one_id(cls, data):
-#         if not data.get('tmdb_id') and not data.get('movieId'):
-#             raise ValueError("Either 'tmdb_id' or 'movieId' must be provided.")
-#         return data
-
-# class RecommendationRequest(BaseModel):
-#     items: List[RecommendationRequestedItem]
-#     n_recommendations: Optional[int] = 20
-    
-# class Recommendation(BaseModel):
-#     movie_source: str
-#     movieId: Optional[int] = None
-#     tmdb_id: Optional[int] = None
-#     item_title: Optional[str] = None
-#     predicted_rating: Optional[float] = None
-#     similarity: float
-
-# class RecommendationResponse(BaseModel):
-#     status: str
-#     recommendations: List[Recommendation]
-    
-    
-    
