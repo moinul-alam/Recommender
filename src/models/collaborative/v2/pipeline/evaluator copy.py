@@ -3,54 +3,42 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from src.models.collaborative.v2.services.recommendation_service import RecommendationService
+from src.models.collaborative.v2.services.user_recommendation_service import UserRecommendationService
 from src.models.common.file_config import file_names
-from src.models.common.DataLoader import load_data
 
 logger = logging.getLogger(__name__)
 
 class Evaluator:
     @staticmethod
     def evaluate_prediction(
-        directory_path: str,
-        test_data: pd.DataFrame
+        collaborative_dir_path: str,
+        train_data: pd.DataFrame,
+        test_data: pd.DataFrame,
+        n_recommendations: int = 10,
+        min_similarity: float = 0.1
     ) -> Dict[str, Any]:
         rmse_list = []
         mae_list = []
-        
-        training_data_path = directory_path / file_names["train_set"]
-        if not training_data_path.exists():
-            raise FileNotFoundError(f"Training data file not found at {training_data_path}")
-        
-        test_data_path = directory_path / file_names["test_set"]
-        if not test_data_path.exists():
-            raise FileNotFoundError(f"Test data file not found at {test_data_path}")
-        
-        training_data = load_data(training_data_path)
-        if training_data.empty:
-            raise ValueError("Training data is empty.")
-        
-        test_data = load_data(test_data_path)
-        if test_data.empty:
-            raise ValueError("Test data is empty.")
-        
-        
+
         # Iterate through each user in the test set
-        for userId in test_data['userId'].unique():
-            user_ratings = test_data[test_data['userId'] == userId].set_index('movieId')['rating'].to_dict()
+        for user_id in train_data['user_id'].unique():
+            user_ratings = train_data[train_data['user_id'] == user_id].set_index('tmdb_id')['rating'].to_dict()
             if not user_ratings:
                 continue
 
             # Get recommendations for the user
-            recommendations = RecommendationService.get_recommendations(
+            recommendations = UserRecommendationService.get_user_recommendations(
                 user_ratings=user_ratings,
-                directory_path=directory_path
+                collaborative_dir_path=collaborative_dir_path,
+                file_names=file_names,
+                n_recommendations=n_recommendations,
+                min_similarity=min_similarity
             )
             
             if not recommendations:
                 continue
 
-            recommended_items = {rec['movieId']: rec['similarity'] for rec in recommendations}
+            recommended_items = {rec['tmdb_id']: rec['similarity'] for rec in recommendations}
             
             # Calculate RMSE and MAE for the recommended items
             y_true = np.array([user_ratings[item] for item in recommended_items.keys() if item in user_ratings])

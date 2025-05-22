@@ -17,7 +17,7 @@ class Item(BaseModel):
 class RecommendationRequest(BaseModel):
     """Request model for recommendation API"""
     req_source: str = "tmdb" # "tmdb" or "movieId"
-    n_recommendations: int = 20
+    n_recommendations: int = 10
     items: List[Item]
 
 class Recommendation(BaseModel):
@@ -38,3 +38,13 @@ class RecommendationResponse(BaseModel):
     """Response model for recommendation API"""
     status: str
     recommendations: Dict[str, RecommendationCategory]
+    
+class RecommenderEvaluation(BaseModel):
+    """Evaluation metrics for recommender system"""
+    status: str
+    message: Optional[str] = None
+    precision: Optional[float] = Field(None, description="Precision at K")
+    recall: Optional[float] = Field(None, description="Recall at K")
+    f1_score: Optional[float] = Field(None, description="F1 Score at K")
+    NDCG: Optional[float] = Field(None, description="Normalized Discounted Cumulative Gain at K")
+    HitRate: Optional[float] = Field(None, description="Hit Rate at K")

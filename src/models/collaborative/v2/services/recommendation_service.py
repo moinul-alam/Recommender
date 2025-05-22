@@ -1,7 +1,6 @@
 import pathlib
-import logging
 from fastapi import HTTPException
-from typing import Dict, List, Optional
+from typing import Optional
 from src.models.collaborative.v2.services.base_recommendation_service import BaseRecommendationService
 from src.schemas.recommender_schema import RecommendationRequest, Recommendation, RecommendationResponse, RecommendationCategory
 from src.models.common.logger import app_logger
@@ -83,7 +82,9 @@ class RecommendationService:
                 item_recommender = ItemRecommender(
                     faiss_index=components["faiss_item_index"],
                     embedding_matrix=components["item_matrix"],
+                    user_item_matrix=components["user_item_matrix"],
                     user_item_mappings=components["user_item_mappings"],
+                    user_item_means=components["user_item_means"],
                     similarity_metric=similarity_metric,
                     min_similarity=0.1,
                     tmdb_to_movie_map=tmdb_to_movie_map,
@@ -147,6 +148,7 @@ class RecommendationService:
                     user_item_matrix=components["user_item_matrix"],
                     user_item_mappings=components["user_item_mappings"],
                     svd_user_model=svd_user_model,
+                    user_item_means=components["user_item_means"],
                     similarity_metric=similarity_metric,
                     min_similarity=0.1,
                     n_neighbors=50,

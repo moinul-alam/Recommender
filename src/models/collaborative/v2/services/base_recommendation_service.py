@@ -12,7 +12,7 @@ class BaseRecommendationService:
         "user_item_matrix", "user_item_mappings",
         "user_matrix", "item_matrix",
         "faiss_user_index", "faiss_item_index",
-        "svd_components", "model_info"
+        "svd_components", "model_info", "user_item_means"
     ]
 
     @staticmethod
@@ -52,7 +52,8 @@ class BaseRecommendationService:
             "faiss_user_index": faiss_user_index,
             "faiss_item_index": faiss_item_index,
             "svd_components": components["svd_components"],
-            "model_info": components["model_info"]
+            "model_info": components["model_info"],
+            "user_item_means": components["user_item_means"]
         }
 
     @staticmethod
@@ -74,7 +75,8 @@ class BaseRecommendationService:
             "user_matrix": file_names["user_matrix"],
             "item_matrix": file_names["item_matrix"],
             "svd_components": file_names["svd_components"],
-            "model_info" : file_names["model_info"]
+            "model_info" : file_names["model_info"],
+            "user_item_means": file_names["user_item_means"]
         }
 
         try:

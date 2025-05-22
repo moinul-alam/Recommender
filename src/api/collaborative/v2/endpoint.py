@@ -216,26 +216,20 @@ def evaluate(
         default=str(collaborative_dir_path),
         description="Path to preprocessed dataset"
     ),
-    sample_size: int = Query(
-        default=100,
+    test_size: int = Query(
+        default=10
     ),
-    n_recommendations: int = Query(
+    k: int = Query(
         default=10,
         ge=1,
         le=100
     ),
-    min_similarity: float = Query(
-        default=0.1,
-        ge=0.0,
-        le=1.0
-    )
 ):
     try:
         results = EvaluationService.evaluate_recommender(
-            collaborative_dir_path,
-            sample_size,
-            n_recommendations,
-            min_similarity 
+            directory_path = collaborative_dir_path,
+            test_size = test_size,
+            k = k
         )
         return results
     except ValueError as ve:
