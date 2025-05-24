@@ -4,7 +4,7 @@ from fastapi import HTTPException
 import numpy as np
 import pandas as pd
 from sklearn.metrics import ndcg_score
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 from src.schemas.recommender_schema import RecommenderEvaluation, RecommendationRequest, Item
 from src.models.common.file_config import file_names
@@ -81,19 +81,20 @@ class EvaluationService:
     def evaluate_recommender(
         directory_path: str,
         sample_test_size: int = 10,
-        k: int = 10,
-        req_source: str = "movieId",
-        recommendation_type: str = "both"  # "item_based", "user_based", or "both"
-    ) -> RecommenderEvaluation:
+        k: int = 20,
+        req_source: str = "movieId"
+    ) -> Tuple[RecommenderEvaluation, RecommenderEvaluation]:
         """
-        Evaluate the recommender system using test data.
+        Evaluate both item-based and user-based recommender systems using test data.
         
         Args:
             directory_path: Path to the model directory
             sample_test_size: Number of users to sample for evaluation (0 for all)
             k: Number of recommendations to evaluate
             req_source: Source type for recommendations ("movieId" or "tmdb")
-            recommendation_type: Type of recommendations to evaluate
+        
+        Returns:
+            Tuple of (item_based_evaluation, user_based_evaluation)
         """
         try:
             directory_path = Path(directory_path)
@@ -138,54 +139,85 @@ class EvaluationService:
 
             logger.info(f"Using {len(test_sample)} test samples from {test_sample['userId'].nunique()} users")
 
-            # Get evaluation results
-            results = EvaluationService.get_evaluation(
+            # Evaluate item-based recommender
+            logger.info("Starting item-based recommender evaluation...")
+            item_based_results = EvaluationService.get_evaluation(
                 test_data=test_sample,
                 training_data=training_data,
                 directory_path=str(directory_path),
                 k=k,
                 req_source=req_source,
-                recommendation_type=recommendation_type
+                recommendation_type="item_based"
             )
 
-            metrics = results["metrics"]
-            evaluation_df = results["evaluation_df"]
+            item_based_metrics = item_based_results["metrics"]
+            item_based_evaluation_df = item_based_results["evaluation_df"]
 
-            logger.info(f"Evaluation completed. Average metrics: {metrics}")
+            logger.info(f"Item-based evaluation completed. Average metrics: {item_based_metrics}")
 
-            return RecommenderEvaluation(
+            item_based_evaluation = RecommenderEvaluation(
                 status="success",
-                message=f"Evaluation completed successfully for {len(evaluation_df)} users",
-                precision=metrics.get("precision", 0.0),
-                recall=metrics.get("recall", 0.0),
-                f1_score=metrics.get("f1_score", 0.0),
-                NDCG=metrics.get("NDCG", 0.0),
-                HitRate=metrics.get("HitRate", 0.0)
+                recommender_type="item_based",
+                precision=item_based_metrics.get("precision", 0.0),
+                recall=item_based_metrics.get("recall", 0.0),
+                f1_score=item_based_metrics.get("f1_score", 0.0),
+                NDCG=item_based_metrics.get("NDCG", 0.0),
+                HitRate=item_based_metrics.get("HitRate", 0.0)
             )
+
+            # Evaluate user-based recommender
+            logger.info("Starting user-based recommender evaluation...")
+            user_based_results = EvaluationService.get_evaluation(
+                test_data=test_sample,
+                training_data=training_data,
+                directory_path=str(directory_path),
+                k=k,
+                req_source=req_source,
+                recommendation_type="user_based"
+            )
+
+            user_based_metrics = user_based_results["metrics"]
+            user_based_evaluation_df = user_based_results["evaluation_df"]
+
+            logger.info(f"User-based evaluation completed. Average metrics: {user_based_metrics}")
+
+            user_based_evaluation = RecommenderEvaluation(
+                status="success",
+                recommender_type="user_based",
+                precision=user_based_metrics.get("precision", 0.0),
+                recall=user_based_metrics.get("recall", 0.0),
+                f1_score=user_based_metrics.get("f1_score", 0.0),
+                NDCG=user_based_metrics.get("NDCG", 0.0),
+                HitRate=user_based_metrics.get("HitRate", 0.0)
+            )
+
+            return item_based_evaluation, user_based_evaluation
 
         except ValueError as ve:
             logger.error(f"Value error during evaluation: {ve}", exc_info=True)
-            return RecommenderEvaluation(
+            error_evaluation = RecommenderEvaluation(
                 status="error",
-                message=str(ve),
+                recommender_type="unknown",
                 precision=0.0,
                 recall=0.0,
                 f1_score=0.0,
                 NDCG=0.0,
                 HitRate=0.0
             )
+            return error_evaluation, error_evaluation
 
         except Exception as e:
             logger.error(f"Model evaluation failed: {e}", exc_info=True)
-            return RecommenderEvaluation(
-                status="error", 
-                message=f"Evaluation failed: {str(e)}",
+            error_evaluation = RecommenderEvaluation(
+                status="error",
+                recommender_type="unknown",
                 precision=0.0,
                 recall=0.0,
                 f1_score=0.0,
                 NDCG=0.0,
                 HitRate=0.0
             )
+            return error_evaluation, error_evaluation
 
     @staticmethod
     def get_evaluation(
@@ -194,11 +226,11 @@ class EvaluationService:
         directory_path: str,
         k: int = 10,
         req_source: str = "movieId",
-        recommendation_type: str = "both",
+        recommendation_type: str = "item_based",
         min_user_ratings: int = 5
     ) -> Dict[str, Any]:
         """
-        Perform the actual evaluation.
+        Perform the actual evaluation for a specific recommendation type.
         
         Args:
             test_data: Test dataset
@@ -206,7 +238,7 @@ class EvaluationService:
             directory_path: Path to model directory
             k: Number of recommendations to evaluate
             req_source: Source type for recommendations
-            recommendation_type: Type of recommendations to evaluate
+            recommendation_type: Type of recommendations to evaluate ("item_based" or "user_based")
             min_user_ratings: Minimum number of ratings a user must have in training data
         """
         
@@ -224,7 +256,7 @@ class EvaluationService:
 
         # Group test data by user
         test_users = test_data['userId'].unique()
-        logger.info(f"Evaluating {len(test_users)} users")
+        logger.info(f"Evaluating {len(test_users)} users for {recommendation_type} recommender")
 
         for user_id in test_users:
             try:
@@ -268,34 +300,20 @@ class EvaluationService:
                     failed_evaluations += 1
                     continue
 
-                # Extract recommended items based on recommendation type
+                # Extract recommended items for the specific recommendation type
                 recommended_items = []
-                
-                # Process different recommendation types
                 recommendations_dict = recommendation_response.recommendations
                 
-                if recommendation_type == "item_based" and "item_based" in recommendations_dict:
-                    recs = recommendations_dict["item_based"].recommendations
+                if recommendation_type in recommendations_dict:
+                    recs = recommendations_dict[recommendation_type].recommendations
                     recommended_items = EvaluationService._extract_item_ids(recs, req_source)
-                elif recommendation_type == "user_based" and "user_based" in recommendations_dict:
-                    recs = recommendations_dict["user_based"].recommendations
-                    recommended_items = EvaluationService._extract_item_ids(recs, req_source)
-                elif recommendation_type == "both":
-                    # Combine both types, prioritizing item-based
-                    if "item_based" in recommendations_dict:
-                        item_recs = recommendations_dict["item_based"].recommendations
-                        recommended_items.extend(EvaluationService._extract_item_ids(item_recs, req_source))
-                    
-                    if "user_based" in recommendations_dict:
-                        user_recs = recommendations_dict["user_based"].recommendations
-                        user_items = EvaluationService._extract_item_ids(user_recs, req_source)
-                        # Add user-based recommendations that aren't already in the list
-                        for item in user_items:
-                            if item not in recommended_items:
-                                recommended_items.append(item)
+                else:
+                    logger.warning(f"No {recommendation_type} recommendations found for user {user_id}")
+                    failed_evaluations += 1
+                    continue
 
                 if not recommended_items:
-                    logger.warning(f"No valid recommended items extracted for user {user_id}")
+                    logger.warning(f"No valid recommended items extracted for user {user_id} from {recommendation_type}")
                     failed_evaluations += 1
                     continue
 
@@ -322,6 +340,7 @@ class EvaluationService:
 
                 evaluation_records.append({
                     "userId": user_id,
+                    "recommendation_type": recommendation_type,
                     "precision": precision,
                     "recall": recall,
                     "f1_score": f1,
@@ -335,11 +354,11 @@ class EvaluationService:
                 successful_evaluations += 1
 
             except Exception as e:
-                logger.warning(f"Error evaluating user {user_id}: {e}")
+                logger.warning(f"Error evaluating user {user_id} for {recommendation_type}: {e}")
                 failed_evaluations += 1
                 continue
 
-        logger.info(f"Evaluation completed: {successful_evaluations} successful, {failed_evaluations} failed")
+        logger.info(f"{recommendation_type} evaluation completed: {successful_evaluations} successful, {failed_evaluations} failed")
 
         # Calculate average metrics
         avg_metrics = {}
@@ -355,6 +374,7 @@ class EvaluationService:
         avg_metrics["num_evaluated_users"] = successful_evaluations
         avg_metrics["num_failed_users"] = failed_evaluations
         avg_metrics["success_rate"] = round(successful_evaluations / (successful_evaluations + failed_evaluations), 4) if (successful_evaluations + failed_evaluations) > 0 else 0.0
+        avg_metrics["recommendation_type"] = recommendation_type
 
         return {
             "metrics": avg_metrics,

@@ -216,7 +216,7 @@ def evaluate(
         default=str(collaborative_dir_path),
         description="Path to preprocessed dataset"
     ),
-    test_size: int = Query(
+    sample_test_size: int = Query(
         default=10
     ),
     k: int = Query(
@@ -228,7 +228,7 @@ def evaluate(
     try:
         results = EvaluationService.evaluate_recommender(
             directory_path = collaborative_dir_path,
-            test_size = test_size,
+            sample_test_size = sample_test_size,
             k = k
         )
         return results

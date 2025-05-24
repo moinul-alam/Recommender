@@ -17,7 +17,7 @@ class Item(BaseModel):
 class RecommendationRequest(BaseModel):
     """Request model for recommendation API"""
     req_source: str = "tmdb" # "tmdb" or "movieId"
-    n_recommendations: int = 10
+    n_recommendations: int = 20
     items: List[Item]
 
 class Recommendation(BaseModel):
@@ -42,7 +42,7 @@ class RecommendationResponse(BaseModel):
 class RecommenderEvaluation(BaseModel):
     """Evaluation metrics for recommender system"""
     status: str
-    message: Optional[str] = None
+    recommender_type: str
     precision: Optional[float] = Field(None, description="Precision at K")
     recall: Optional[float] = Field(None, description="Recall at K")
     f1_score: Optional[float] = Field(None, description="F1 Score at K")
