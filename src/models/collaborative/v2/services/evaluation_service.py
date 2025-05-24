@@ -4,16 +4,15 @@ from fastapi import HTTPException
 import numpy as np
 import pandas as pd
 from sklearn.metrics import ndcg_score
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 
 from src.schemas.recommender_schema import RecommenderEvaluation, RecommendationRequest, Item
 from src.models.common.file_config import file_names
 from src.models.collaborative.v2.services.recommendation_service import RecommendationService
 from src.models.common.DataLoader import load_data
+from src.models.common.logger import app_logger
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
+logger = app_logger(__name__)
 
 def precision_at_k(recommended: List[int], relevant: set, k: int) -> float:
     """Calculate precision at k."""
@@ -261,7 +260,11 @@ class EvaluationService:
         for user_id in test_users:
             try:
                 # Get user's training data (for generating recommendations)
+                logger.info(f"Evaluating user {user_id} for {recommendation_type} recommender")
+                
                 user_training_data = training_data[training_data['userId'] == user_id]
+                
+                logger.info(f"User {user_id} has {len(user_training_data)} items in their training data.")
                 
                 # Skip users with insufficient training data
                 if len(user_training_data) < min_user_ratings:

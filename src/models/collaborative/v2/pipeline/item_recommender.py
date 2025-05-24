@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple
 import logging
 from scipy import sparse
 from functools import lru_cache
+from src.models.common.file_config import file_names
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,10 @@ class ItemRecommender:
         self.item_reverse_mapping = self.user_item_mappings.get("item_reverse_mapping", {})
         
         # Extract means
-        self.user_means = user_item_means.get('user_means', np.array([]))
-        self.item_means = user_item_means.get('item_means', np.array([]))
+        user_means = file_names['user_means']
+        item_means = file_names['item_means']
+        self.user_means = user_item_means.get(user_means, np.array([]))
+        self.item_means = user_item_means.get(item_means, np.array([]))
         self.global_mean = np.mean(self.user_means) if len(self.user_means) > 0 else 3.5
         
         # Precompute item popularity for better recommendations
