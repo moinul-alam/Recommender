@@ -35,9 +35,13 @@ class ItemRecommender:
         
         # Extract means
         user_means = file_names['user_means']
+        logger.info(f"Loading user means from {user_means}")
         item_means = file_names['item_means']
+        logger.info(f"Loading item means from {item_means}")
         self.user_means = user_item_means.get(user_means, np.array([]))
+        logger.info(f"User means loaded with shape: {self.user_means.shape}")
         self.item_means = user_item_means.get(item_means, np.array([]))
+        logger.info(f"Item means loaded with shape: {self.item_means.shape}")
         self.global_mean = np.mean(self.user_means) if len(self.user_means) > 0 else 3.5
         
         # Precompute item popularity for better recommendations

@@ -5,6 +5,8 @@ import logging
 from scipy import sparse
 from functools import lru_cache
 from src.models.common.logger import app_logger
+from src.models.common.file_config import file_names
+
 
 logger = app_logger(__name__)
 
@@ -49,8 +51,18 @@ class UserRecommender:
             raise ValueError("Item mappings are required but not provided")
         
         # Extract means
-        self.user_means = user_item_means.get('user_means', np.array([]))
-        self.item_means = user_item_means.get('item_means', np.array([]))
+        # self.user_means = user_item_means.get('user_means', np.array([]))
+        # self.item_means = user_item_means.get('item_means', np.array([]))
+        # self.global_mean = np.mean(self.user_means) if len(self.user_means) > 0 else 3.5
+        # Extract means
+        user_means = file_names['user_means']
+        logger.info(f"Loading user means from {user_means}")
+        item_means = file_names['item_means']
+        logger.info(f"Loading item means from {item_means}")
+        self.user_means = user_item_means.get(user_means, np.array([]))
+        logger.info(f"User means loaded with shape: {self.user_means.shape}")
+        self.item_means = user_item_means.get(item_means, np.array([]))
+        logger.info(f"Item means loaded with shape: {self.item_means.shape}")
         self.global_mean = np.mean(self.user_means) if len(self.user_means) > 0 else 3.5
         
         # Precompute item statistics for better recommendations
